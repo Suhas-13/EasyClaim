@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Claim, CreditCompanyUi } from "../components/CreditCompanyUi";
 import { Status, Graph } from "../components/Graph";
+import Navbar from "../components/Navbar";
 
 export const CreditCompanyPage = () => {
   const [selectedClaimState, setSelectedClaimState] = useState<
@@ -24,12 +25,15 @@ export const CreditCompanyPage = () => {
     );
   }, []);
   return (
+    <div>
+      <Navbar></Navbar>
     <div className="flex flex-row min-h-5 h-screen">
       <CreditCompanyUi
         claims={filteredClaims}
         setClaimStatus={setClaimStatus}
       />
       <Graph handleStateClaimChange={handleStateClaimChange} />
+    </div>
     </div>
   );
 };
