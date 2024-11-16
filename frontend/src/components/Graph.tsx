@@ -141,7 +141,7 @@ export const Graph = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   return (
-    <div className="flex w-full">
+    <div className="flex w-1/2">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -152,29 +152,6 @@ export const Graph = ({
       >
         <Background gap={12} size={1} color="#808080" />
         <Controls />
-        <MiniMap
-          nodeColor={(node) => {
-            switch (node.id) {
-              case "1":
-                return "#EFEFEF";
-              case "2":
-                return "#FCE4EC";
-              case "3":
-                return "#FFF9C4";
-              case "4":
-                return "#E8F5E9";
-              case "5":
-                return "#E3F2FD";
-              case "6":
-                return "#C8E6C9";
-              case "7":
-                return "#FFCDD2";
-              default:
-                return "#ddd";
-            }
-          }}
-          maskColor="#ffffff"
-        />
       </ReactFlow>
     </div>
   );
