@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from "react";
 
+// Define the Message type
+interface Message {
+  content: string;
+  type: "user" | "credit-card" | "adjudicator" | "seller";
+  author: string;
+  timestamp: string;
+}
+
 const RefundClaimDiscussion = () => {
-  const [claimSummary, setClaimSummary] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
+  // Define the state with the correct type
+  const [claimSummary, setClaimSummary] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>([]); // Use Message[] type
+  const [newMessage, setNewMessage] = useState<string>("");
 
   // Initialize claim summary and messages
   useEffect(() => {
