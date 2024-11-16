@@ -121,12 +121,6 @@
                 }
             });
 
-            socket.on('connect', function() {
-                appendMessage('System: Connected to the server.');
-                // Fetch previous messages
-                fetchMessages(claimId);
-            });
-
             socket.on('message', function(data) {
                 // Remove existing options if any
                 removeOptions();
