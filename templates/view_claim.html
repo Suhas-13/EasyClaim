@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>View Claim {{ claim.id }}</title>
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
     <style>
         /* Basic styles for the chat window */
         #chat-window {
@@ -26,12 +27,75 @@
     <h1>Claim ID: {{ claim.id }}</h1>
     <p>Status: {{ claim.status }}</p>
     <div id="chat-window">
-        {% for message in messages %}
-            <p class="sender-{{ message.sender }}">
-                <strong>{{ message.sender.capitalize() }}:</strong> {{ message.content }}
-            </p>
+        {% for msg in messages %}
+            <p><strong>{{ msg.sender.capitalize() }}:</strong> {{ msg.content }}</p>
         {% endfor %}
     </div>
+
+    {% if not chat_locked %}
+    <input type="text" id="message-input" placeholder="Type your message..." style="width:500px;">
+    <button id="send-button">Send</button>
+    <input type="file" id="file-input" multiple style="display:none;">
+    <button id="upload-button">Upload Files</button>
+    {% else %}
+    <p>The chat is currently locked. Please wait for updates.</p>
+    {% endif %}
+
     <a href="{{ url_for('index') }}">Back to Claims List</a>
+
+    <script>
+        var socket = io();
+        var chatWindow = document.getElementById('chat-window');
+        var messageInput = document.getElementById('message-input');
+        var sendButton = document.getElementById('send-button');
+        var fileInput = document.getElementById('file-input');
+        var uploadButton = document.getElementById('upload-button');
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+
+        socket.on('message', function(data) {
+            appendMessage(data.text);
+        });
+
+        sendButton.addEventListener('click', function() {
+            var message = messageInput.value;
+            if (message.trim() === '') return;
+            appendMessage('You: ' + message);
+            socket.emit('user_response', {'text': message});
+            messageInput.value = '';
+        });
+
+        uploadButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function() {
+            var files = fileInput.files;
+            for (var i = 0; i < files.length; i++) {
+                (function(file) {
+                    var reader = new FileReader();
+                    reader.onload = function(evt) {
+                        var fileData = evt.target.result;
+                        socket.emit('upload_file', {
+                            'filename': file.name,
+                            'file': fileData
+                        });
+                        appendMessage('You uploaded: ' + file.name);
+                    };
+                    reader.readAsDataURL(file);
+                })(files[i]);
+            }
+            fileInput.value = '';
+        });
+
+        function appendMessage(message) {
+            var p = document.createElement('p');
+            p.innerHTML = message;
+            chatWindow.appendChild(p);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+    </script>
 </body>
 </html>

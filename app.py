@@ -4,6 +4,11 @@ os.environ['EVENTLET_HUB'] = 'poll'
 import eventlet
 eventlet.monkey_patch()
 
+from openai import OpenAI
+
+from flask import jsonify
+
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 from flask import Flask, render_template, request, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -20,16 +25,27 @@ import base64
 import json
 from datetime import datetime
 import mimetypes
-import uuid  # For generating unique user IDs
+import uuid
+from enum import Enum
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with your actual secret key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///claims.db'
 app.config['UPLOAD_FOLDER'] = 'uploaded_files'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db = SQLAlchemy(app)
-socketio = SocketIO(app)
+socketio = SocketIO(app, manage_session=False)
+
+
+
+# Define Claim States
+class ClaimState(Enum):
+    START = 'START'
+    COLLECTING_INFO = 'COLLECTING_INFO'
+    UPLOADING_EVIDENCE = 'UPLOADING_EVIDENCE'
+    FINALIZING = 'FINALIZING'
+    COMPLETED = 'COMPLETED'
 
 # Database Models
 class User(db.Model):
@@ -43,17 +59,23 @@ class Claim(db.Model):
     raw_text = db.Column(db.Text)
     structured_data = db.Column(db.Text)
     status = db.Column(db.String(50))
+    state = db.Column(db.String(50), default=ClaimState.START.value)
     adjudication_result = db.Column(db.Text)
     expert_feedback = db.Column(db.Text)
     merchant_response = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     messages = db.relationship('Message', backref='claim', lazy=True)
     files = db.relationship('File', backref='claim', lazy=True)
+    chat_locked = db.Column(db.Boolean, default=False)
+    current_question = db.Column(db.String(50))  # To track the current question
+    claim_summary = db.Column(db.Text)
+    answers = db.Column(db.Text)  # New field to store answers as JSON
+    question_index = db.Column(db.Integer)  # New field to store current question index
 
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     claim_id = db.Column(db.Integer, db.ForeignKey('claim.id'))
-    sender = db.Column(db.String(50))  # 'user' or 'assistant'
+    sender = db.Column(db.String(50))  # 'user', 'assistant', or 'merchant'
     content = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -68,84 +90,14 @@ class File(db.Model):
 with app.app_context():
     db.create_all()
 
-# Define the question flow
-questions = [
-    {
-        'id': 'issue_type',
-        'question': 'Please select the issue you are experiencing:',
-        'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other'],
-        'next': {
-            'Item not received': 'tracking_info',
-            'Item damaged': 'damage_description',
-            'Unauthorized transaction': 'unauthorized_details',
-            'Other': 'additional_details_other'
-        }
-    },
-    {
-        'id': 'tracking_info',
-        'question': 'Do you have a tracking number or shipping link for your order?',
-        'options': ['Yes', 'No'],
-        'next': {
-            'Yes': 'collect_tracking_info',
-            'No': 'evidence_available'
-        }
-    },
-    {
-        'id': 'collect_tracking_info',
-        'question': 'Please provide the tracking number or shipping link.',
-        'next': 'evidence_available'
-    },
-    {
-        'id': 'damage_description',
-        'question': 'Please describe the damage to the item.',
-        'next': 'evidence_available'
-    },
-    {
-        'id': 'unauthorized_details',
-        'question': 'Have you reported this unauthorized transaction to your bank?',
-        'options': ['Yes', 'No'],
-        'next': 'evidence_available'
-    },
-    {
-        'id': 'additional_details_other',
-        'question': 'Please provide additional details about the issue.',
-        'next': 'evidence_available'
-    },
-    {
-        'id': 'evidence_available',
-        'question': 'Do you have any evidence to support your claim? (e.g., photos, receipts)',
-        'options': ['Yes', 'No'],
-        'next': {
-            'Yes': 'collect_evidence',
-            'No': 'finalize'
-        }
-    },
-    {
-    'id': 'collect_evidence',
-    'question': 'Please upload your evidence files. When you are done uploading, type "Done".',
-    'next': 'more_evidence'
-    },
-    {
-        'id': 'more_evidence',
-        'question': 'Do you have more evidence to upload?',
-        'options': ['Yes', 'No'],
-        'next': {
-            'Yes': 'collect_evidence',
-            'No': 'finalize'
-        }
-    },
-    {
-        'id': 'finalize',
-        'question': 'Thank you. We have collected all the necessary information.',
-        'next': None
-    }
+# Define the required fields for the claim
+required_fields = [
+    {'id': 'item_or_service', 'question': 'Is the dispute about an item or a service?', 'field': 'item_or_service', 'options': ['Item', 'Service']},
+    {'id': 'issue_description', 'question': 'Please describe the issue you are experiencing.', 'field': 'issue_description', 'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other']},
+    {'id': 'item_name', 'question': 'Please provide the name of the item or service.', 'field': 'item_name'},
+    {'id': 'have_contacted_seller', 'question': 'Have you contacted the merchant about this issue?', 'field': 'have_contacted_seller', 'options': ['Yes', 'No']},
+    {'id': 'shipping_info', 'question': 'Please provide any shipping information (tracking number or shipping link) if available.', 'field': 'shipping_info', 'optional': True, 'condition': lambda answers: answers.get('issue_description') == 'Item not received'},
 ]
-
-def get_question_by_id(question_id):
-    for question in questions:
-        if question['id'] == question_id:
-            return question
-    return None
 
 @app.before_request
 def load_user():
@@ -222,10 +174,24 @@ def view_claim(claim_id):
     if not claim:
         return 'Claim not found or you do not have access to it.', 404
 
-    # Get the messages associated with the claim
-    messages = Message.query.filter_by(claim_id=claim.id).order_by(Message.timestamp).all()
+    # Determine if chat is locked
+    chat_locked = claim.chat_locked
 
-    return render_template('view_claim.html', claim=claim, messages=messages)
+    session['current_claim_id'] = claim.id
+
+    return render_template('view_claim.html', claim=claim, chat_locked=chat_locked)
+
+@app.route('/get_messages/<int:claim_id>', methods=['GET'])
+def get_messages(claim_id):
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    if not claim:
+        return jsonify({'error': 'Unauthorized access or claim not found.'}), 403
+
+    messages = Message.query.filter_by(claim_id=claim_id).order_by(Message.timestamp).all()
+    messages_list = [{'sender': msg.sender, 'content': msg.content, 'timestamp': msg.timestamp.isoformat()} for msg in messages]
+    return jsonify({'messages': messages_list, 'claim_summary': claim.claim_summary})
 
 @socketio.on('connect')
 def handle_connect():
@@ -238,20 +204,30 @@ def handle_connect():
     # Check if a claim is already in progress
     claim_id = session.get('current_claim_id')
     if not claim_id:
-        # Create a new claim
-        claim = Claim(user_id=user.id, status='In Progress')
-        db.session.add(claim)
-        db.session.commit()
-        # Store the claim ID in the session
-        session['current_claim_id'] = claim.id
+        # Check for incomplete claims
+        incomplete_claim = Claim.query.filter_by(user_id=user.id, status='In Progress').first()
+        if incomplete_claim:
+            claim = incomplete_claim
+            session['current_claim_id'] = claim.id
+        else:
+            # Create a new claim
+            claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
+            db.session.add(claim)
+            db.session.commit()
+            session['current_claim_id'] = claim.id
     else:
         claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
         if not claim:
             # Claim not found, create a new one
-            claim = Claim(user_id=user.id, status='In Progress')
+            claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
             db.session.add(claim)
             db.session.commit()
             session['current_claim_id'] = claim.id
+
+    # Check if the chat is locked
+    if claim.chat_locked:
+        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
+        return
 
     # Get transaction details from the client
     transaction_details_json = request.args.get('transaction_details')
@@ -267,12 +243,25 @@ def handle_connect():
             'transaction_id': 'TX1234567890'
         }
 
-    session['current_question'] = 'issue_type'
-    session['answers'] = {}
     session['transaction_details'] = transaction_details
 
-    # Send initial message with transaction details
-    transaction_info = f"""
+    # Do not emit previous messages here to prevent duplicates
+
+    # If the claim is already completed, do not ask questions
+    if claim.state == ClaimState.COMPLETED.value:
+        return
+
+    # If there is a current question, resume from there
+    if claim.current_question:
+        ask_next_question(claim)
+    else:
+        # Start the conversation
+        start_conversation(claim, transaction_details)
+
+def start_conversation(claim, transaction_details):
+    # Only send initial messages if this is a new claim (no messages exist)
+    if not claim.messages:
+        transaction_info = f"""
 You are disputing the following transaction:
 
 - **Transaction Name**: {transaction_details['transaction_name']}
@@ -282,19 +271,156 @@ You are disputing the following transaction:
 - **Transaction ID**: {transaction_details['transaction_id']}
 
 """
-    emit('message', {'text': transaction_info})
-    emit('message', {'text': 'Let\'s proceed to gather more information about your dispute.'})
-    ask_next_question()
+        emit('message', {'text': transaction_info})
+        emit('message', {'text': 'Let\'s proceed to gather more information about your dispute.'})
 
-def ask_next_question():
-    question_id = session.get('current_question')
-    question = get_question_by_id(question_id)
+        # Save assistant messages
+        message1 = Message(claim_id=claim.id, sender='assistant', content=transaction_info)
+        message2 = Message(claim_id=claim.id, sender='assistant', content='Let\'s proceed to gather more information about your dispute.')
+        db.session.add(message1)
+        db.session.add(message2)
+        db.session.commit()
 
-    if question:
-        emit('message', {'text': question['question'], 'options': question.get('options', [])})
-    else:
-        # Process the collected information and create a structured claim
-        create_claim()
+    # Initialize answers
+    if not claim.answers:
+        claim.answers = json.dumps({})
+        db.session.commit()
+
+    # Start asking questions
+    if claim.question_index is None:
+        claim.question_index = 0
+        db.session.commit()
+
+    ask_next_question(claim)
+
+def is_question_redundant(claim, field):
+    # Check if the question is not relevant based on previous answers
+    answers = json.loads(claim.answers)
+    condition = field.get('condition')
+    if condition and not condition(answers):
+        return True  # The question is redundant
+    # Check if the question has already been answered in previous responses
+    # Fetch previous messages
+    messages_db = Message.query.filter_by(claim_id=claim.id).order_by(Message.timestamp).all()
+    # Get the question text
+    question = field['question']
+    # Build the conversation history
+    conversation = []
+    for msg in messages_db:
+        role = 'assistant' if msg.sender == 'assistant' else 'user'
+        conversation.append({'role': role, 'content': msg.content})
+    # Add system prompt
+    system_prompt = "You are an assistant helping to determine if the user's previous responses have already answered a specific question in a credit card chargeback process."
+    messages = [{'role': 'system', 'content': system_prompt}]
+    # Add the conversation history
+    messages.extend(conversation)
+    # Add the final assistant prompt
+    assistant_prompt = f"Has the user already provided an answer to the following question: '{question}'? Respond with 'Yes' or 'No' in JSON format: {{\"answered\": \"Yes\" or \"No\"}}"
+    messages.append({'role': 'assistant', 'content': assistant_prompt})
+    # Call GPT-4 API
+    try:
+        response = client.chat.completions.create(model="gpt-4o",
+        messages=messages,
+        max_tokens=50,
+        temperature=0.0,
+        response_format={ "type": "json_object" })
+        assistant_reply = response.choices[0].message.content.strip()
+        result = json.loads(assistant_reply)
+        answered = result.get('answered', 'No')
+        if answered.lower() == 'yes':
+            # Try to extract the answer
+            extracted_answer = extract_answer(claim, question)
+            if extracted_answer:
+                # Save the extracted answer
+                answers[field['id']] = extracted_answer
+                claim.answers = json.dumps(answers)
+                db.session.commit()
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error in is_question_redundant: {e}")
+        return False
+
+def extract_answer(claim, question_text):
+    # Fetch previous messages
+    messages_db = Message.query.filter_by(claim_id=claim.id).order_by(Message.timestamp).all()
+
+    # Build the conversation history
+    conversation = []
+    for msg in messages_db:
+        role = 'assistant' if msg.sender == 'assistant' else 'user'
+        conversation.append({'role': role, 'content': msg.content})
+
+    # Add system prompt
+    system_prompt = "You are an assistant helping to extract the user's answer to a specific question from the conversation history."
+    messages = [{'role': 'system', 'content': system_prompt}]
+
+    # Add the conversation history
+    messages.extend(conversation)
+
+    # Add the final assistant prompt
+    assistant_prompt = f"Please extract the user's answer to the following question: '{question_text}'. Provide the answer in JSON format: {{\"answer\": \"User's answer here\"}}"
+    messages.append({'role': 'assistant', 'content': assistant_prompt})
+
+    # Call GPT-4 API
+    try:
+        response = client.chat.completions.create(model="gpt-4o",
+        messages=messages,
+        max_tokens=150,
+        temperature=0.0,
+        response_format={ "type": "json_object" })
+        assistant_reply = response.choices[0].message.content.strip()
+        result = json.loads(assistant_reply)
+        answer = result.get('answer', '')
+        return answer
+    except Exception as e:
+        print(f"Error in extract_answer: {e}")
+        return None
+
+def ask_next_question(claim):
+    answers = json.loads(claim.answers)
+    question_index = claim.question_index or 0
+
+    # Find the next required field that hasn't been answered
+    while question_index < len(required_fields):
+        field = required_fields[question_index]
+        field_id = field['id']
+        if field_id not in answers:
+            # Check if the question is redundant
+            if is_question_redundant(claim, field):
+                # The question is redundant; skip it
+                question_index += 1
+                claim.question_index = question_index
+                db.session.commit()
+                continue  # Proceed to the next question
+            else:
+                # Ask this question
+                emit('message', {'text': field['question']})
+
+                # Save assistant message
+                message = Message(claim_id=claim.id, sender='assistant', content=field['question'])
+                db.session.add(message)
+                db.session.commit()
+
+                # Update the claim's current question and question index
+                claim.current_question = field_id
+                claim.question_index = question_index
+                db.session.commit()
+                return
+        else:
+            question_index += 1
+
+    # All required fields have been answered
+    # Proceed to evidence upload
+    claim.current_question = 'evidence_available'
+    db.session.commit()
+    emit('message', {'text': 'Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".'})
+
+    # Save assistant message
+    message = Message(claim_id=claim.id, sender='assistant', content='Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".')
+    db.session.add(message)
+    db.session.commit()
 
 @socketio.on('user_response')
 def handle_user_response(data):
@@ -306,34 +432,103 @@ def handle_user_response(data):
     if not claim:
         return
 
-    question_id = session.get('current_question')
-    question = get_question_by_id(question_id)
-    user_response = data.get('text')
+    # Check if the chat is locked
+    if claim.chat_locked:
+        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
+        return
 
-    # Save the user's response
-    answers = session.get('answers', {})
-    answers[question_id] = user_response
-    session['answers'] = answers
+    current_question = claim.current_question
+    user_response = data.get('text')
 
     # Save message to database
     message = Message(claim_id=claim.id, sender='user', content=user_response)
     db.session.add(message)
     db.session.commit()
 
-    # Determine the next question
-    next_question_id = None
-    if 'next' in question:
-        if isinstance(question['next'], dict):
-            next_question_id = question['next'].get(user_response, None)
+    if current_question == 'evidence_available':
+        if user_response.strip().lower() == 'done':
+            # Proceed to create claim
+            create_claim()
         else:
-            next_question_id = question['next']
+            emit('message', {'text': 'Please upload your evidence files. When you are done uploading, type "Done".'})
+            # Save assistant message
+            assistant_message = Message(claim_id=claim.id, sender='assistant', content='Please upload your evidence files. When you are done uploading, type "Done".')
+            db.session.add(assistant_message)
+            db.session.commit()
+        return
 
-    if next_question_id:
-        session['current_question'] = next_question_id
-        ask_next_question()
+    # Load existing answers
+    answers = json.loads(claim.answers)
+
+    # Save the user's response
+    answers[current_question] = user_response
+    claim.answers = json.dumps(answers)
+    db.session.commit()
+
+    # Validate the response with GPT-4
+    field = required_fields[claim.question_index]
+    validation_result = validate_response_with_gpt4(claim.id, field['question'], user_response)
+
+    if validation_result['valid'] or field.get('optional', False):
+        # Move to the next question
+        claim.question_index += 1
+        claim.current_question = None
+        db.session.commit()
+        ask_next_question(claim)
     else:
-        # No more questions; finalize the claim
-        create_claim()
+        # Ask for clarification
+        clarification = validation_result['clarification']
+        emit('message', {'text': clarification})
+
+        # Save assistant's message
+        assistant_message = Message(claim_id=claim.id, sender='assistant', content=clarification)
+        db.session.add(assistant_message)
+        db.session.commit()
+
+    # Generate the claim summary
+    # Remove generate_claim_summary, as we're using generate_structured_summary in create_claim
+
+def validate_response_with_gpt4(claim_id, question_text, user_response):
+    # Fetch previous messages
+    messages_db = Message.query.filter_by(claim_id=claim_id).order_by(Message.timestamp.desc()).limit(5).all()
+    # Reverse to get the correct order
+    messages_db.reverse()
+
+    # Build the conversation history
+    messages = []
+    for msg in messages_db:
+        role = 'assistant' if msg.sender == 'assistant' else 'user'
+        messages.append({'role': role, 'content': msg.content})
+
+    # Add the current question and user response
+    messages.append({'role': 'assistant', 'content': question_text})
+    messages.append({'role': 'user', 'content': user_response})
+
+    # Add system prompt
+    system_prompt = "You are an assistant helping to validate user responses to a predefined question in a credit card chargeback process."
+    messages.insert(0, {'role': 'system', 'content': system_prompt})
+
+    # Add instruction to produce JSON output
+    instruction = "Please determine if the user's response adequately answers the question, considering the conversation so far. If not, provide a polite clarification or request for more information, avoiding repeating previous responses. Respond in JSON format: {\"valid\": true/false, \"clarification\": \"Your message here\"}"
+    messages.append({'role': 'assistant', 'content': instruction})
+
+    # Call GPT-4 API
+    response = client.chat.completions.create(model="gpt-4o",
+    messages=messages,
+    max_tokens=150,
+    temperature=0.5,
+    response_format={ "type": "json_object" })
+
+    assistant_reply = response.choices[0].message.content.strip()
+
+    try:
+        result = json.loads(assistant_reply)
+        valid = result.get('valid', False)
+        clarification = result.get('clarification', '')
+        return {'valid': valid, 'clarification': clarification}
+    except json.JSONDecodeError:
+        # Default to valid response to avoid blocking the flow
+        return {'valid': True, 'clarification': ''}
 
 @socketio.on('upload_file')
 def handle_file_upload(data):
@@ -343,6 +538,11 @@ def handle_file_upload(data):
     claim_id = session.get('current_claim_id')
     claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
     if not claim:
+        return
+
+    # Check if the chat is locked
+    if claim.chat_locked:
+        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
         return
 
     file_data = data.get('file')
@@ -365,15 +565,7 @@ def handle_file_upload(data):
     db.session.add(message)
     db.session.commit()
 
-    emit('message', {'text': 'File received.'})
-    # Proceed to the next question
-    question = get_question_by_id(session.get('current_question'))
-    next_question_id = question.get('next')
-    if next_question_id:
-        session['current_question'] = next_question_id
-        ask_next_question()
-    else:
-        create_claim()
+    emit('message', {'text': 'File received. If you have more evidence, please upload them. When you are done, type "Done".'})
 
 def create_claim():
     session_id = request.sid
@@ -384,15 +576,8 @@ def create_claim():
     if not claim:
         return
 
-    answers = session.get('answers', {})
+    answers = json.loads(claim.answers)
     transaction_details = session.get('transaction_details', {})
-
-    # Combine the answers into raw text
-    raw_text = '\n'.join([f"{key}: {value}" for key, value in answers.items()])
-
-    # Include transaction details in the raw text
-    transaction_info = '\n'.join([f"{key}: {value}" for key, value in transaction_details.items()])
-    raw_text = f"Transaction Details:\n{transaction_info}\n\nUser Responses:\n{raw_text}"
 
     # Get files associated with the claim
     files = []
@@ -403,33 +588,44 @@ def create_claim():
             files.append({
                 'name': file_record.filename,
                 'data': file_data,
-                'type': file_record.filetype
+                'type': file_record.filetype,
+                'filepath': file_record.filepath  # Include filepath for PDF processing
             })
 
     # Generate structured summary using LLM
-    structured_data = generate_structured_summary(raw_text, files, user.id, transaction_details)
+    structured_data = generate_structured_summary(answers, files, user.id, transaction_details)
     claim.structured_data = json.dumps(structured_data)
     claim.status = 'Pending'
+    claim.state = ClaimState.COMPLETED.value
+    claim.chat_locked = False  # Do not lock the chat immediately
+    claim.current_question = None  # Reset current question
+    claim.question_index = None
     db.session.commit()
 
+    # Clear session variables
+    session.pop('current_claim_id', None)
+    session.pop('transaction_details', None)
+
     # Inform the user that the claim has been submitted
-    emit('message', {'text': f'Your claim has been submitted successfully. Your claim ID is {claim.id}.'})
+    emit('message', {'text': f'Your claim has been submitted successfully. Your claim ID is {claim.id}. We will notify you when there is an update.'})
 
     # Save assistant message to chat history
-    message = Message(claim_id=claim.id, sender='assistant', content=f'Your claim has been submitted successfully. Your claim ID is {claim.id}.')
+    message = Message(claim_id=claim.id, sender='assistant', content=f'Your claim has been submitted successfully. Your claim ID is {claim.id}. We will notify you when there is an update.')
     db.session.add(message)
     db.session.commit()
 
     # Run expert reviews in a separate thread to avoid blocking
-    threading.Thread(target=run_expert_reviews, args=(claim.id,)).start()
+    run_expert_reviews(claim.id)
 
 def run_expert_reviews(claim_id):
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         return
 
     structured_data = json.loads(claim.structured_data)
-    user_uuid = claim.user.user_uuid
+    with app.app_context():
+        user_uuid = claim.user.user_uuid
 
     # Shipping expert review
     shipping_feedback = shipping_expert_review(structured_data)
@@ -447,17 +643,18 @@ def run_expert_reviews(claim_id):
     follow_up_needed = False
     follow_up_messages = []
 
-    if shipping_feedback.get('additional_info_needed'):
+    if shipping_feedback.get('action') == 'request_additional_info':
         follow_up_needed = True
         follow_up_messages.append(shipping_feedback['additional_info_needed'])
 
-    if chargeback_feedback.get('additional_info_needed'):
+    if chargeback_feedback.get('action') == 'request_additional_info':
         follow_up_needed = True
         follow_up_messages.append(chargeback_feedback['additional_info_needed'])
 
     session_id = None
     for sess_id, socket_session in socketio.server.environ.items():
-        if socket_session['/'].get('user_uuid') == user_uuid:
+        socket_user_uuid = socket_session.get('user_uuid', session.get('user_uuid'))
+        if socket_user_uuid == user_uuid:
             session_id = sess_id
             break
 
@@ -469,23 +666,27 @@ def run_expert_reviews(claim_id):
             message = Message(claim_id=claim.id, sender='assistant', content=msg)
             db.session.add(message)
             db.session.commit()
-        # TODO: Handle follow-up responses from the user
-    elif shipping_feedback.get('action') == 'wait_for_delivery' and session_id:
+        # Set the claim status back to 'In Progress'
+        claim.status = 'In Progress'
+        claim.chat_locked = False
+        db.session.commit()
+    elif shipping_feedback.get('action') == 'wait' and session_id:
         # Inform the user to wait
-        wait_message = 'Our experts suggest waiting until the expected delivery date before proceeding with the dispute.'
+        wait_message = 'Our experts suggest waiting before proceeding with the dispute.'
         emit('message', {'text': wait_message}, room=session_id)
         # Save assistant message
         message = Message(claim_id=claim.id, sender='assistant', content=wait_message)
         db.session.add(message)
         db.session.commit()
-        claim.status = 'Waiting for Delivery'
+        claim.status = 'Waiting'
         db.session.commit()
     else:
         # Proceed to send claim to merchant
         send_claim_to_merchant(claim_id)
 
 def send_claim_to_merchant(claim_id):
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         return
 
@@ -521,7 +722,8 @@ def send_email(to_email, subject, body):
 
 @app.route('/merchant_view/<int:claim_id>')
 def merchant_view(claim_id):
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         return 'Claim not found.', 404
     structured_data = json.loads(claim.structured_data)
@@ -534,7 +736,8 @@ def merchant_connect(data):
         emit('error', {'message': 'No claim ID provided.'})
         return
     claim_id = int(claim_id)
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         emit('error', {'message': 'Invalid claim ID.'})
         return
@@ -549,7 +752,8 @@ def merchant_response(data):
         emit('error', {'message': 'Invalid data provided.'})
         return
     claim_id = int(claim_id)
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         emit('error', {'message': 'Invalid claim ID.'})
         return
@@ -564,7 +768,8 @@ def merchant_response(data):
     emit('message', {'text': 'Thank you for your response. We will review the information provided.'})
 
 def perform_final_adjudication(claim_id):
-    claim = Claim.query.get(claim_id)
+    with app.app_context():
+        claim = Claim.query.get(claim_id)
     if not claim:
         return
 
@@ -582,7 +787,8 @@ def perform_final_adjudication(claim_id):
 
     session_id = None
     for sess_id, socket_session in socketio.server.environ.items():
-        if socket_session['/'].get('user_uuid') == user_uuid:
+        socket_user_uuid = socket_session.get('user_uuid', session.get('user_uuid'))
+        if socket_user_uuid == user_uuid:
             session_id = sess_id
             break
 
@@ -599,7 +805,6 @@ def perform_final_adjudication(claim_id):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    # No need to remove sessions as data is stored in the database
     pass
 
 @app.route('/uploaded_files/<filename>')
@@ -607,4 +812,4 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=False)

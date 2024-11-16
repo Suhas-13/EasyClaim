@@ -96,7 +96,20 @@
         var chatContainer = document.getElementById('chat-container');
         var claimsList = document.getElementById('claims-list');
 
+        // Extract claim_id from the URL if available
+        var claimId = null;
+        var pathParts = window.location.pathname.split('/');
+        if (pathParts[1] === 'claim' && pathParts[2]) {
+            claimId = parseInt(pathParts[2]);
+        }
+
         startClaimButton.addEventListener('click', function() {
+            // Redirect to start a new claim
+            window.location.href = '/start_new_claim';
+        });
+
+        // Initialize the chat if claimId is present
+        if (claimId) {
             // Hide the claims list and show the chat container
             claimsList.style.display = 'none';
             chatContainer.style.display = 'block';
@@ -110,6 +123,8 @@
 
             socket.on('connect', function() {
                 appendMessage('System: Connected to the server.');
+                // Fetch previous messages
+                fetchMessages(claimId);
             });
 
             socket.on('message', function(data) {
@@ -122,10 +137,14 @@
                 }
             });
 
+            socket.on('claim_summary', function(data) {
+                displayClaimSummary(data.summary);
+            });
+
             socket.on('disconnect', function() {
                 appendMessage('System: Disconnected from the server.');
             });
-        });
+        }
 
         sendButton.addEventListener('click', function() {
             var message = messageInput.value;
@@ -188,6 +207,49 @@
             if (existingOptions) {
                 existingOptions.parentNode.removeChild(existingOptions);
             }
+        }
+
+        function displayClaimSummary(summary) {
+            var summaryDiv = document.getElementById('claim-summary');
+            if (!summaryDiv) {
+                summaryDiv = document.createElement('div');
+                summaryDiv.id = 'claim-summary';
+                summaryDiv.style.border = '1px solid #ccc';
+                summaryDiv.style.padding = '10px';
+                summaryDiv.style.marginTop = '10px';
+                summaryDiv.innerHTML = '<h3>Claim Summary:</h3>';
+                chatWindow.appendChild(summaryDiv);
+            }
+            summaryDiv.innerHTML = '<h3>Claim Summary:</h3>' + summary;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function fetchMessages(claimId) {
+            fetch('/get_messages/' + claimId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        appendMessage('System: ' + data.error);
+                        return;
+                    }
+                    var messages = data.messages;
+                    var claimSummary = data.claim_summary;
+
+                    // Render messages
+                    messages.forEach(function(msg) {
+                        var sender = msg.sender === 'user' ? 'You' : 'Assistant';
+                        appendMessage(sender + ': ' + msg.content);
+                    });
+
+                    // Render claim summary if available
+                    if (claimSummary) {
+                        displayClaimSummary(claimSummary);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching messages:', error);
+                    appendMessage('System: Error fetching messages.');
+                });
         }
     </script>
 </body>
