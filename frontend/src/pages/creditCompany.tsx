@@ -46,6 +46,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file1.pdf", "file2.pdf"],
     status: Status.ClaimSubmitted,
     submissionDate: new Date("2023-01-01"),
+    events: [],
   },
   {
     id: 2,
@@ -54,6 +55,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file3.pdf", "file4.pdf"],
     status: Status.ClaimApproved,
     submissionDate: new Date("2023-02-01"),
+    events: [],
   },
   {
     id: 3,
@@ -62,6 +64,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file5.pdf", "file6.pdf"],
     status: Status.AwaitingReview,
     submissionDate: new Date("2023-03-01"),
+    events: [],
   },
   {
     id: 4,
@@ -70,6 +73,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file7.pdf", "file8.pdf"],
     status: Status.AwaitingCustomerDocuments,
     submissionDate: new Date("2023-04-01"),
+    events: [],
   },
   {
     id: 5,
@@ -78,6 +82,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file9.pdf", "file10.pdf"],
     status: Status.AwaitingSellerDocuments,
     submissionDate: new Date("2023-05-01"),
+    events: [],
   },
   {
     id: 6,
@@ -86,6 +91,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file11.pdf", "file12.pdf"],
     status: Status.AwaitingLLMScreening,
     submissionDate: new Date("2023-06-01"),
+    events: [],
   },
   {
     id: 7,
@@ -94,6 +100,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file13.pdf", "file14.pdf"],
     status: Status.ClaimRejected,
     submissionDate: new Date("2023-07-01"),
+    events: [],
   },
   {
     id: 8,
@@ -102,6 +109,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file15.pdf", "file16.pdf"],
     status: Status.ClaimSubmitted,
     submissionDate: new Date("2023-08-01"),
+    events: [],
   },
   {
     id: 9,
@@ -110,6 +118,7 @@ const mockClaims: Claim[] = [
     documentFiles: ["file17.pdf", "file18.pdf"],
     status: Status.AwaitingReview,
     submissionDate: new Date("2023-09-01"),
+    events: [],
   },
   {
     id: 10,
@@ -118,5 +127,6 @@ const mockClaims: Claim[] = [
     documentFiles: ["file19.pdf", "file20.pdf"],
     status: Status.ClaimApproved,
     submissionDate: new Date("2023-10-01"),
+    events: [],
   },
 ];

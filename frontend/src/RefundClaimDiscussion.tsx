@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ClaimDetails } from "./types";
+import { Claim } from "./types";
 import Navbar from "./components/Navbar";
 import ClaimSummary from "./components/ClaimSummary";
 
@@ -11,7 +11,7 @@ interface Message {
 }
 
 interface RefundClaimDiscussionProps {
-  claimDetails: ClaimDetails;
+  claimDetails: Claim;
   messages: Message[];
 }
 

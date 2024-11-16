@@ -6,6 +6,7 @@ import { CreditCompanyPage } from "./pages/creditCompany";
 import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
 import BankingApp from "./components/BankingApp";
+import Home from "./pages/home";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -37,8 +38,7 @@ const App = () => {
     // Set demo messages
     setMessages([
       {
-        content:
-          "The refund has been initiated. Please wait 3-5 business days.",
+        content: "The refund has been initiated. Please wait 3-5 business days.",
         type: "credit-card",
         author: "Credit Card Co.",
         timestamp: "10:12 AM",
@@ -73,7 +73,7 @@ const App = () => {
           <Route path="/policyView" element={<PolicyView />} />
 
           <Route
-            path="/refundClaimDiscussion"
+            path="/refundClaimDiscussion/:id"
             element={
               claimDetails && (
                 <RefundClaimDiscussion
@@ -91,6 +91,12 @@ const App = () => {
               />
             }
           />
+          <Route
+            path="/home"
+            element={
+              <Home></Home>
+            }>
+          </Route>
         </Routes>
       </Router>
     </div>
