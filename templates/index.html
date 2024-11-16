@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Claim Assistant</title>
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <style>
+        .option-button {
+            margin: 5px;
+            padding: 8px 12px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .option-button:hover {
+            background-color: #0056b3;
+        }
+        #chat-window p {
+            margin: 5px 0;
+        }
+        .file-link {
+            display: block;
+            margin: 5px 0;
+            color: #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <h1>Claim Assistant Chat</h1>
+    <div id="chat-window" style="border:1px solid #ccc; padding:10px; width:600px; height:400px; overflow-y:scroll;">
+    </div>
+    <input type="text" id="message-input" placeholder="Type your message..." style="width:500px;">
+    <button id="send-button">Send</button>
+    <input type="file" id="file-input" multiple>
+    <button id="upload-button">Upload Files</button>
+
+    <script>
+        var transactionDetails = {
+            transaction_name: "{{ transaction_details.transaction_name }}",
+            date: "{{ transaction_details.date }}",
+            merchant_name: "{{ transaction_details.merchant_name }}",
+            merchant_email: "{{ transaction_details.merchant_email }}",
+            transaction_id: "{{ transaction_details.transaction_id }}"
+        };
+
+        var socket = io({
+            query: {
+                transaction_details: JSON.stringify(transactionDetails)
+            }
+        });
+
+        var chatWindow = document.getElementById('chat-window');
+        var messageInput = document.getElementById('message-input');
+        var sendButton = document.getElementById('send-button');
+        var fileInput = document.getElementById('file-input');
+        var uploadButton = document.getElementById('upload-button');
+
+        socket.on('connect', function() {
+            appendMessage('System: Connected to the server.');
+        });
+
+        socket.on('message', function(data) {
+            // Remove existing options if any
+            removeOptions();
+
+            appendMessage('Assistant: ' + data.text);
+
+            if (data.options && data.options.length > 0) {
+                displayOptions(data.options);
+            }
+        });
+
+        sendButton.addEventListener('click', function() {
+            var message = messageInput.value;
+            appendMessage('You: ' + message);
+            socket.emit('user_response', {'text': message});
+            messageInput.value = '';
+            // Remove options after user responds
+            removeOptions();
+        });
+
+        uploadButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function() {
+            var files = fileInput.files;
+            for (var i = 0; i < files.length; i++) {
+                (function(file) {
+                    var reader = new FileReader();
+                    reader.onload = function(evt) {
+                        var fileData = evt.target.result;
+                        socket.emit('upload_file', {
+                            'filename': file.name,
+                            'file': fileData
+                        });
+                        appendMessage('You uploaded: ' + file.name);
+                    };
+                    reader.readAsDataURL(file);
+                })(files[i]);
+            }
+            fileInput.value = '';
+        });
+
+        function appendMessage(message) {
+            var p = document.createElement('p');
+            p.innerHTML = message;
+            chatWindow.appendChild(p);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function displayOptions(options) {
+            var optionsContainer = document.createElement('div');
+            optionsContainer.id = 'options-container';
+            options.forEach(function(option) {
+                var button = document.createElement('button');
+                button.className = 'option-button';
+                button.textContent = option;
+                button.addEventListener('click', function() {
+                    messageInput.value = option;
+                });
+                optionsContainer.appendChild(button);
+            });
+            chatWindow.appendChild(optionsContainer);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function removeOptions() {
+            var existingOptions = document.getElementById('options-container');
+            if (existingOptions) {
+                existingOptions.parentNode.removeChild(existingOptions);
+            }
+        }
+    </script>
+</body>
+</html>
