@@ -70,7 +70,7 @@ const App = () => {
           <Route
             path="/refundClaimDiscussion"
             element={
-              <RefundClaimDiscussion
+              claimDetails && <RefundClaimDiscussion
                 claimDetails={claimDetails}
                 messages={messages}
               />
