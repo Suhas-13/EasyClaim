@@ -21,6 +21,7 @@ import json
 from datetime import datetime
 import mimetypes
 import uuid  # For generating unique user IDs
+from mailersend import emails
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -30,6 +31,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
+mailer = emails.NewEmail(os.environ.get('MAILERSEND_API_KEY'))
 
 # Database Models
 class User(db.Model):
@@ -597,6 +599,38 @@ def perform_final_adjudication(claim_id):
         db.session.add(message_record)
         db.session.commit()
 
+def send_email():
+    # define an empty dict to populate with mail values
+    mail_body = {}
+
+    mail_from = {
+        "name": "EasyClaim",
+        "email": "easyclaim94@gmail.com",
+    }
+
+    recipients = [
+        {
+            "name": "shashah",
+            "email": "shashah.dahdah@gmail.com",
+        }
+    ]
+
+    # reply_to = {
+    #     "name": "Name",
+    #     "email": "reply@domain.com",
+    # }
+
+    mailer.set_mail_from(mail_from, mail_body)
+    mailer.set_mail_to(recipients, mail_body)
+    mailer.set_subject("Hello!", mail_body)
+    mailer.set_html_content("This is the HTML content", mail_body)
+    mailer.set_plaintext_content("This is the text content", mail_body)
+    # mailer.set_reply_to(reply_to, mail_body)
+    print('sending mail body: ', mail_body)
+    # using print() will also return status code and data
+    mailer.send(mail_body)
+    print('mail sent')
+
 @socketio.on('disconnect')
 def handle_disconnect():
     # No need to remove sessions as data is stored in the database
@@ -608,3 +642,4 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
+    send_email()
