@@ -3,6 +3,7 @@ import RefundClaimDiscussion from "./RefundClaimDiscussion"; // Import RefundCla
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CreditCompanyPage } from "./pages/creditCompany";
+import { Claim } from "./components/Claim";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -70,12 +71,15 @@ const App = () => {
           <Route
             path="/refundClaimDiscussion"
             element={
-              claimDetails && <RefundClaimDiscussion
-                claimDetails={claimDetails}
-                messages={messages}
-              />
+              claimDetails && (
+                <RefundClaimDiscussion
+                  claimDetails={claimDetails}
+                  messages={messages}
+                />
+              )
             }
           />
+          <Route path="/claim/:id" element={<Claim />} />
         </Routes>
       </Router>
     </div>
