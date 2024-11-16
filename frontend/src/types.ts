@@ -1,13 +1,17 @@
+import { Status } from "./components/Graph";
+
 // Define the structure of the event
 export interface Event {
   timestamp: string;
   description: string;
 }
 
-// Define the structure of the claim details
-export interface ClaimDetails {
-  date: string;
+export interface Claim {
+  id: number;
+  name: string;
   description: string;
-  id: string;
+  documentFiles: string[];
   events: Event[];
+  status: Status;
+  submissionDate: Date;
 }

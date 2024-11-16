@@ -19,24 +19,19 @@ const Navbar: React.FC = () => {
             Home
           </Link>
           <Link
-            to="/policies"
+            to="/policyView"
             className="text-slate-300 hover:text-emerald-500 transition duration-200"
           >
-            Policies
+            Your Policies
           </Link>
           <Link
-            to="/refundClaimDiscussion"
+            to="/refundClaimDiscussion/1"
             className="text-slate-300 hover:text-emerald-500 transition duration-200"
           >
             Claim Overview
           </Link>
           {/* Add more links as necessary */}
         </div>
-
-        {/* Actions (e.g., Button) */}
-        <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md transition duration-200">
-          Action Button
-        </button>
       </div>
     </div>
   );
