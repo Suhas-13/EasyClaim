@@ -38,8 +38,7 @@ const App = () => {
     // Set demo messages
     setMessages([
       {
-        content:
-          "The refund has been initiated. Please wait 3-5 business days.",
+        content: "The refund has been initiated. Please wait 3-5 business days.",
         type: "credit-card",
         author: "Credit Card Co.",
         timestamp: "10:12 AM",
