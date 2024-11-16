@@ -20,6 +20,7 @@ import base64
 import json
 from datetime import datetime
 import mimetypes
+import uuid  # For generating unique user IDs
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -33,7 +34,7 @@ socketio = SocketIO(app)
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(100), unique=True)
+    user_uuid = db.Column(db.String(100), unique=True)
     claims = db.relationship('Claim', backref='user', lazy=True)
 
 class Claim(db.Model):
@@ -43,6 +44,8 @@ class Claim(db.Model):
     structured_data = db.Column(db.Text)
     status = db.Column(db.String(50))
     adjudication_result = db.Column(db.Text)
+    expert_feedback = db.Column(db.Text)
+    merchant_response = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     messages = db.relationship('Message', backref='claim', lazy=True)
     files = db.relationship('File', backref='claim', lazy=True)
@@ -62,7 +65,10 @@ class File(db.Model):
     filetype = db.Column(db.String(50))
     description = db.Column(db.Text)
 
+with app.app_context():
+    db.create_all()
 
+# Define the question flow
 questions = [
     {
         'id': 'issue_type',
@@ -115,9 +121,18 @@ questions = [
         }
     },
     {
-        'id': 'collect_evidence',
-        'question': 'Please upload your evidence files.',
-        'next': 'finalize'
+    'id': 'collect_evidence',
+    'question': 'Please upload your evidence files. When you are done uploading, type "Done".',
+    'next': 'more_evidence'
+    },
+    {
+        'id': 'more_evidence',
+        'question': 'Do you have more evidence to upload?',
+        'options': ['Yes', 'No'],
+        'next': {
+            'Yes': 'collect_evidence',
+            'No': 'finalize'
+        }
     },
     {
         'id': 'finalize',
@@ -132,8 +147,52 @@ def get_question_by_id(question_id):
             return question
     return None
 
+@app.before_request
+def load_user():
+    user_uuid = session.get('user_uuid')
+    if not user_uuid:
+        # No user UUID in session, create a new user
+        user_uuid = str(uuid.uuid4())
+        session['user_uuid'] = user_uuid
+        # Create a new user in the database
+        user = User(user_uuid=user_uuid)
+        db.session.add(user)
+        db.session.commit()
+    else:
+        # User UUID exists, retrieve the user
+        user = User.query.filter_by(user_uuid=user_uuid).first()
+        if not user:
+            # User not found in database, create a new user
+            user = User(user_uuid=user_uuid)
+            db.session.add(user)
+            db.session.commit()
+
+@app.route('/login/<user_uuid>')
+def login(user_uuid):
+    # Check if the user exists
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    if user:
+        # Set the user_uuid in the session
+        session['user_uuid'] = user_uuid
+        return redirect(url_for('index'))
+    else:
+        # User not found, create a new user
+        user = User(user_uuid=user_uuid)
+        db.session.add(user)
+        db.session.commit()
+        session['user_uuid'] = user_uuid
+        return redirect(url_for('index'))
+
 @app.route('/')
 def index():
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    if not user:
+        return redirect(url_for('load_user'))
+
+    # Retrieve the user's claims
+    claims = Claim.query.filter_by(user_id=user.id).all()
+
     # For testing purposes, we're using hardcoded transaction details
     # In a real application, these would be provided based on user selection
     transaction_details = {
@@ -143,11 +202,57 @@ def index():
         'merchant_email': 'merchant@example.com',
         'transaction_id': 'TX1234567890'
     }
-    return render_template('index.html', transaction_details=transaction_details)
+
+    return render_template('index.html', transaction_details=transaction_details, claims=claims)
+
+@app.route('/start_new_claim')
+def start_new_claim():
+    session.pop('current_claim_id', None)
+    return redirect(url_for('index'))
+
+@app.route('/claim/<int:claim_id>')
+def view_claim(claim_id):
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    if not user:
+        return redirect(url_for('load_user'))
+
+    # Get the claim
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    if not claim:
+        return 'Claim not found or you do not have access to it.', 404
+
+    # Get the messages associated with the claim
+    messages = Message.query.filter_by(claim_id=claim.id).order_by(Message.timestamp).all()
+
+    return render_template('view_claim.html', claim=claim, messages=messages)
 
 @socketio.on('connect')
 def handle_connect():
     session_id = request.sid
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    if not user:
+        return
+
+    # Check if a claim is already in progress
+    claim_id = session.get('current_claim_id')
+    if not claim_id:
+        # Create a new claim
+        claim = Claim(user_id=user.id, status='In Progress')
+        db.session.add(claim)
+        db.session.commit()
+        # Store the claim ID in the session
+        session['current_claim_id'] = claim.id
+    else:
+        claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+        if not claim:
+            # Claim not found, create a new one
+            claim = Claim(user_id=user.id, status='In Progress')
+            db.session.add(claim)
+            db.session.commit()
+            session['current_claim_id'] = claim.id
+
     # Get transaction details from the client
     transaction_details_json = request.args.get('transaction_details')
     if transaction_details_json:
@@ -161,13 +266,6 @@ def handle_connect():
             'merchant_email': 'merchant@example.com',
             'transaction_id': 'TX1234567890'
         }
-
-    # Create or get the user
-    user = User.query.filter_by(session_id=session_id).first()
-    if not user:
-        user = User(session_id=session_id)
-        db.session.add(user)
-        db.session.commit()
 
     session['current_question'] = 'issue_type'
     session['answers'] = {}
@@ -201,6 +299,13 @@ def ask_next_question():
 @socketio.on('user_response')
 def handle_user_response(data):
     session_id = request.sid
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    claim_id = session.get('current_claim_id')
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    if not claim:
+        return
+
     question_id = session.get('current_question')
     question = get_question_by_id(question_id)
     user_response = data.get('text')
@@ -211,12 +316,9 @@ def handle_user_response(data):
     session['answers'] = answers
 
     # Save message to database
-    user = User.query.filter_by(session_id=session_id).first()
-    claim = Claim.query.filter_by(user_id=user.id).order_by(Claim.id.desc()).first()
-    if claim:
-        message = Message(claim_id=claim.id, sender='user', content=user_response)
-        db.session.add(message)
-        db.session.commit()
+    message = Message(claim_id=claim.id, sender='user', content=user_response)
+    db.session.add(message)
+    db.session.commit()
 
     # Determine the next question
     next_question_id = None
@@ -236,6 +338,13 @@ def handle_user_response(data):
 @socketio.on('upload_file')
 def handle_file_upload(data):
     session_id = request.sid
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    claim_id = session.get('current_claim_id')
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    if not claim:
+        return
+
     file_data = data.get('file')
     file_name = data.get('filename')
     # Decode the data URL
@@ -247,17 +356,14 @@ def handle_file_upload(data):
         f.write(file_bytes)
 
     # Save file info to database
-    user = User.query.filter_by(session_id=session_id).first()
-    claim = Claim.query.filter_by(user_id=user.id).order_by(Claim.id.desc()).first()
-    if claim:
-        file_record = File(claim_id=claim.id, filename=file_name, filepath=file_path, filetype=mimetypes.guess_type(file_name)[0])
-        db.session.add(file_record)
-        db.session.commit()
+    file_record = File(claim_id=claim.id, filename=file_name, filepath=file_path, filetype=mimetypes.guess_type(file_name)[0])
+    db.session.add(file_record)
+    db.session.commit()
 
-        # Add file message to chat history
-        message = Message(claim_id=claim.id, sender='user', content=f'Uploaded file: {file_name}')
-        db.session.add(message)
-        db.session.commit()
+    # Add file message to chat history
+    message = Message(claim_id=claim.id, sender='user', content=f'Uploaded file: {file_name}')
+    db.session.add(message)
+    db.session.commit()
 
     emit('message', {'text': 'File received.'})
     # Proceed to the next question
@@ -271,8 +377,11 @@ def handle_file_upload(data):
 
 def create_claim():
     session_id = request.sid
-    user = User.query.filter_by(session_id=session_id).first()
-    if not user:
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    claim_id = session.get('current_claim_id')
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    if not claim:
         return
 
     answers = session.get('answers', {})
@@ -287,10 +396,6 @@ def create_claim():
 
     # Get files associated with the claim
     files = []
-    claim = Claim(user_id=user.id, raw_text=raw_text, status='Pending')
-    db.session.add(claim)
-    db.session.commit()
-
     file_records = File.query.filter_by(claim_id=claim.id).all()
     for file_record in file_records:
         with open(file_record.filepath, 'rb') as f:
@@ -304,10 +409,16 @@ def create_claim():
     # Generate structured summary using LLM
     structured_data = generate_structured_summary(raw_text, files, user.id, transaction_details)
     claim.structured_data = json.dumps(structured_data)
+    claim.status = 'Pending'
     db.session.commit()
 
     # Inform the user that the claim has been submitted
     emit('message', {'text': f'Your claim has been submitted successfully. Your claim ID is {claim.id}.'})
+
+    # Save assistant message to chat history
+    message = Message(claim_id=claim.id, sender='assistant', content=f'Your claim has been submitted successfully. Your claim ID is {claim.id}.')
+    db.session.add(message)
+    db.session.commit()
 
     # Run expert reviews in a separate thread to avoid blocking
     threading.Thread(target=run_expert_reviews, args=(claim.id,)).start()
@@ -318,7 +429,7 @@ def run_expert_reviews(claim_id):
         return
 
     structured_data = json.loads(claim.structured_data)
-    session_id = claim.user.session_id
+    user_uuid = claim.user.user_uuid
 
     # Shipping expert review
     shipping_feedback = shipping_expert_review(structured_data)
@@ -344,7 +455,13 @@ def run_expert_reviews(claim_id):
         follow_up_needed = True
         follow_up_messages.append(chargeback_feedback['additional_info_needed'])
 
-    if follow_up_needed:
+    session_id = None
+    for sess_id, socket_session in socketio.server.environ.items():
+        if socket_session['/'].get('user_uuid') == user_uuid:
+            session_id = sess_id
+            break
+
+    if follow_up_needed and session_id:
         # Send follow-up messages to the user
         for msg in follow_up_messages:
             emit('message', {'text': msg}, room=session_id)
@@ -353,7 +470,7 @@ def run_expert_reviews(claim_id):
             db.session.add(message)
             db.session.commit()
         # TODO: Handle follow-up responses from the user
-    elif shipping_feedback.get('action') == 'wait_for_delivery':
+    elif shipping_feedback.get('action') == 'wait_for_delivery' and session_id:
         # Inform the user to wait
         wait_message = 'Our experts suggest waiting until the expected delivery date before proceeding with the dispute.'
         emit('message', {'text': wait_message}, room=session_id)
@@ -461,23 +578,33 @@ def perform_final_adjudication(claim_id):
     db.session.commit()
 
     # Notify user of the result
-    session_id = claim.user.session_id
+    user_uuid = claim.user.user_uuid
+
+    session_id = None
+    for sess_id, socket_session in socketio.server.environ.items():
+        if socket_session['/'].get('user_uuid') == user_uuid:
+            session_id = sess_id
+            break
+
     if session_id:
         decision = adjudication_result.get('decision', 'Pending')
         rationale = adjudication_result.get('rationale', '')
         message = f"Your claim has been adjudicated. Decision: {decision}. Rationale: {rationale}"
         emit('message', {'text': message}, room=session_id)
 
+        # Save assistant message
+        message_record = Message(claim_id=claim.id, sender='assistant', content=message)
+        db.session.add(message_record)
+        db.session.commit()
+
 @socketio.on('disconnect')
 def handle_disconnect():
-    session_id = request.sid
     # No need to remove sessions as data is stored in the database
+    pass
 
 @app.route('/uploaded_files/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     socketio.run(app, debug=True)
