@@ -24,16 +24,58 @@
             margin: 5px 0;
             color: #007BFF;
         }
+        .sender-user {
+            color: blue;
+        }
+        .sender-assistant {
+            color: green;
+        }
+        #chat-container {
+            display: none; /* Initially hide the chat container */
+        }
+        #claims-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #claims-list li {
+            margin: 5px 0;
+        }
+        #claims-list a {
+            margin-left: 10px;
+            color: #007BFF;
+        }
     </style>
 </head>
 <body>
     <h1>Claim Assistant Chat</h1>
-    <div id="chat-window" style="border:1px solid #ccc; padding:10px; width:600px; height:400px; overflow-y:scroll;">
+
+    <!-- Display User's Claims -->
+    <div id="claims-list">
+        {% if claims %}
+            <h2>Your Claims</h2>
+            <ul>
+                {% for claim in claims %}
+                    <li>
+                        <strong>Claim ID:</strong> {{ claim.id }} - <strong>Status:</strong> {{ claim.status }}
+                        <a href="{{ url_for('view_claim', claim_id=claim.id) }}">View Chat</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>You have no claims yet.</p>
+        {% endif %}
+        <button id="start-claim-button">Start a New Claim</button>
     </div>
-    <input type="text" id="message-input" placeholder="Type your message..." style="width:500px;">
-    <button id="send-button">Send</button>
-    <input type="file" id="file-input" multiple>
-    <button id="upload-button">Upload Files</button>
+
+    <!-- Chat Interface -->
+    <div id="chat-container">
+        <div id="chat-window" style="border:1px solid #ccc; padding:10px; width:600px; height:400px; overflow-y:scroll;">
+        </div>
+        <input type="text" id="message-input" placeholder="Type your message..." style="width:500px;">
+        <button id="send-button">Send</button>
+        <input type="file" id="file-input" multiple style="display:none;">
+        <button id="upload-button">Upload Files</button>
+    </div>
 
     <script>
         var transactionDetails = {
@@ -44,35 +86,50 @@
             transaction_id: "{{ transaction_details.transaction_id }}"
         };
 
-        var socket = io({
-            query: {
-                transaction_details: JSON.stringify(transactionDetails)
-            }
-        });
-
+        var socket;
         var chatWindow = document.getElementById('chat-window');
         var messageInput = document.getElementById('message-input');
         var sendButton = document.getElementById('send-button');
         var fileInput = document.getElementById('file-input');
         var uploadButton = document.getElementById('upload-button');
+        var startClaimButton = document.getElementById('start-claim-button');
+        var chatContainer = document.getElementById('chat-container');
+        var claimsList = document.getElementById('claims-list');
 
-        socket.on('connect', function() {
-            appendMessage('System: Connected to the server.');
-        });
+        startClaimButton.addEventListener('click', function() {
+            // Hide the claims list and show the chat container
+            claimsList.style.display = 'none';
+            chatContainer.style.display = 'block';
 
-        socket.on('message', function(data) {
-            // Remove existing options if any
-            removeOptions();
+            // Initialize the socket connection
+            socket = io({
+                query: {
+                    transaction_details: JSON.stringify(transactionDetails)
+                }
+            });
 
-            appendMessage('Assistant: ' + data.text);
+            socket.on('connect', function() {
+                appendMessage('System: Connected to the server.');
+            });
 
-            if (data.options && data.options.length > 0) {
-                displayOptions(data.options);
-            }
+            socket.on('message', function(data) {
+                // Remove existing options if any
+                removeOptions();
+
+                appendMessage('Assistant: ' + data.text);
+                if (data.options && data.options.length > 0) {
+                    displayOptions(data.options);
+                }
+            });
+
+            socket.on('disconnect', function() {
+                appendMessage('System: Disconnected from the server.');
+            });
         });
 
         sendButton.addEventListener('click', function() {
             var message = messageInput.value;
+            if (message.trim() === '') return;
             appendMessage('You: ' + message);
             socket.emit('user_response', {'text': message});
             messageInput.value = '';

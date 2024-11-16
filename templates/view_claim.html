@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Claim {{ claim.id }}</title>
+    <style>
+        /* Basic styles for the chat window */
+        #chat-window {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 600px;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        #chat-window p {
+            margin: 5px 0;
+        }
+        .sender-user {
+            color: blue;
+        }
+        .sender-assistant {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Claim ID: {{ claim.id }}</h1>
+    <p>Status: {{ claim.status }}</p>
+    <div id="chat-window">
+        {% for message in messages %}
+            <p class="sender-{{ message.sender }}">
+                <strong>{{ message.sender.capitalize() }}:</strong> {{ message.content }}
+            </p>
+        {% endfor %}
+    </div>
+    <a href="{{ url_for('index') }}">Back to Claims List</a>
+</body>
+</html>
