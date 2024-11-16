@@ -8,51 +8,65 @@ import {
   MiniMap,
   useEdgesState,
   useNodesState,
+  NodeMouseHandler,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 
-const initialNodes: Node[] = [
+type NodeProps = {
+  label: string;
+};
+
+export enum Status {
+  ClaimSubmitted = "Claim Submitted",
+  AwaitingCustomerDocuments = "📄 Awaiting Customer Documents",
+  AwaitingSellerDocuments = "📂 Awaiting Seller Documents",
+  AwaitingLLMScreening = "🔍 Awaiting LLM Screening",
+  AwaitingReview = "📋 Awaiting Review",
+  ClaimApproved = "✅ Claim Approved",
+  ClaimRejected = "❌ Claim Rejected",
+}
+const initialNodes: Node<NodeProps>[] = [
   {
     id: "1",
     position: { x: 100, y: 50 },
-    data: { label: "📝 Claim Submitted" },
+    data: { label: Status.ClaimSubmitted },
     style: { background: "#EFEFEF", color: "#333", borderRadius: "8px" },
   },
   {
     id: "2",
     position: { x: 100, y: 150 },
-    data: { label: "📄 Awaiting Customer Documents" },
+    data: { label: Status.AwaitingCustomerDocuments },
     style: { background: "#FCE4EC", color: "#AD1457", borderRadius: "8px" },
   },
   {
     id: "3",
     position: { x: 300, y: 150 },
-    data: { label: "📂 Awaiting Seller Documents" },
+    data: { label: Status.AwaitingSellerDocuments },
     style: { background: "#FFF9C4", color: "#F57F17", borderRadius: "8px" },
   },
   {
     id: "4",
     position: { x: 200, y: 250 },
-    data: { label: "🔍 Awaiting LLM Screening" },
+    data: { label: Status.AwaitingLLMScreening },
     style: { background: "#E8F5E9", color: "#2E7D32", borderRadius: "8px" },
   },
   {
     id: "5",
     position: { x: 100, y: 350 },
-    data: { label: "📋 Awaiting Review" },
+    data: { label: Status.AwaitingReview },
     style: { background: "#E3F2FD", color: "#1565C0", borderRadius: "8px" },
   },
   {
     id: "6",
     position: { x: 50, y: 450 },
-    data: { label: "✅ Claim Approved" },
+    data: { label: Status.ClaimApproved },
     style: { background: "#C8E6C9", color: "#1B5E20", borderRadius: "8px" },
   },
   {
     id: "7",
     position: { x: 250, y: 450 },
-    data: { label: "❌ Claim Rejected" },
+    data: { label: Status.ClaimRejected },
     style: { background: "#FFCDD2", color: "#B71C1C", borderRadius: "8px" },
   },
 ];
@@ -111,20 +125,32 @@ const initialEdges: Edge[] = [
   },
 ];
 
-export const Graph = () => {
+export const Graph = ({
+  handleStateClaimChange,
+}: {
+  handleStateClaimChange: (claimState: string) => void;
+}) => {
+  const onNodeClick: NodeMouseHandler<Node<NodeProps>> = React.useCallback(
+    (event, node) => {
+      handleStateClaimChange(node.data.label);
+    },
+    []
+  );
+
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div className="flex w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodeClick={onNodeClick}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
       >
-        <Background gap={12} size={1} color="#ddd" />
+        <Background gap={12} size={1} color="#808080" />
         <Controls />
         <MiniMap
           nodeColor={(node) => {
