@@ -5,14 +5,24 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CreditCardCompanyPage } from "./pages/creditCardPage";
 
 const App = () => {
-  const [claimSummary, setClaimSummary] = useState<string>("");
+  const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
   const [messages, setMessages] = useState<any[]>([]); // Set initial state for messages
 
   useEffect(() => {
-    setClaimSummary(
-      "Claim ID: #123456\nStatus: Awaiting adjudicator decision\nTotal Amount: $120.99\nDate Filed: 2024-11-01"
-    );
+    // Set demo claim details
+    setClaimDetails({
+      id: "123456",
+      date: "2024-11-01",
+      description: "Refund claim due to delayed shipment of product XYZ.",
+      events: [
+        { timestamp: "2024-11-01", description: "Claim filed by user." },
+        { timestamp: "2024-11-01", description: "Refund initiation started by Credit Card Co." },
+        { timestamp: "2024-11-01", description: "Seller approval received for refund." },
+        { timestamp: "2024-11-02", description: "Adjudicator review completed. Pending refund approval." },
+      ],
+    });
 
+    // Set demo messages
     setMessages([
       {
         content:
@@ -55,7 +65,7 @@ const App = () => {
             path="/refundClaimDiscussion"
             element={
               <RefundClaimDiscussion
-                claimSummary={claimSummary}
+                claimDetails={claimDetails}
                 messages={messages}
               />
             }

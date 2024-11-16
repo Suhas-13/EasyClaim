@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
+import { ClaimDetails } from "./types";
+import ClaimSummary from "./ClaimSummary";
 
-// Define the Message type
 interface Message {
   content: string;
   type: "user" | "credit-card" | "adjudicator" | "seller";
@@ -9,64 +10,90 @@ interface Message {
 }
 
 interface RefundClaimDiscussionProps {
-  claimSummary: string;
-  messages: Message[]; // Directly receive messages as a prop
+  claimDetails: ClaimDetails;
+  messages: Message[];
 }
 
-const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({ claimSummary, messages }) => {
+const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
+  claimDetails,
+  messages,
+}) => {
+  const [messageInput, setMessageInput] = useState("");
+
+  const handleSendMessage = () => {
+    if (messageInput.trim()) {
+      console.log("Message sent:", messageInput);
+      setMessageInput("");
+    }
+  };
+
+  const getAuthorColor = (type: Message["type"]) => {
+    const colors = {
+      user: "text-cyan-400",
+      "credit-card": "text-emerald-400",
+      adjudicator: "text-amber-400",
+      seller: "text-rose-400",
+    };
+    return colors[type];
+  };
+
+  const getAvatarColor = (type: Message["type"]) => {
+    const colors = {
+      user: "bg-cyan-500",
+      "credit-card": "bg-emerald-500",
+      adjudicator: "bg-amber-500",
+      seller: "bg-rose-500",
+    };
+    return colors[type];
+  };
 
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-100 font-sans">
-      {/* Left Preview Panel */}
-      <div className="w-1/3 bg-gray-800 shadow-lg p-6 flex flex-col border-r border-gray-600">
-        <h2 className="text-2xl font-bold text-white mb-6">Claim Summary</h2>
-        <div className="text-gray-200 leading-relaxed bg-gray-800 rounded-lg p-4 shadow-inner whitespace-pre-line">
-          {claimSummary || "Loading claim details..."}
-        </div>
+    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
+      {/* Claim Summary */}
+      <div className="w-1/3 border-r border-slate-800">
+      {/* claimDetails={claimDetails} */}
+        <ClaimSummary  />
       </div>
 
-      {/* Chat Window */}
+      {/* Discussion Area */}
       <div className="w-2/3 flex flex-col">
         {/* Header */}
-        <div className="bg-gray-800 shadow-md border-b border-gray-600 p-4 flex items-center justify-between">
+        <div className="bg-slate-900/50 backdrop-blur-sm p-6 flex items-center justify-between border-b border-slate-800">
           <div>
-            <h3 className="text-xl font-bold text-white">#refund-claim</h3>
-            <p className="text-sm text-gray-300">Discussing claim ID #123456</p>
-          </div>
-          <div className="text-sm text-gray-400">
-            <span className="animate-pulse">Live</span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-slate-100">Claim Discussion</h3>
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <p className="text-sm text-slate-400 mt-1">Claim ID #{claimDetails.id}</p>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-gray-850">
+        <div className="flex-1 p-6 space-y-6 overflow-y-auto">
           {messages.map((msg, index) => (
-            <div key={index} className="flex items-start gap-4">
-              {/* Author Avatar */}
-              <div className="w-12 h-12 bg-gray-600 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold">
-                {msg.author[0].toUpperCase()}
-              </div>
-
-              {/* Message Content */}
-              <div className="flex flex-col w-full">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-sm font-semibold ${
-                      msg.type === "user"
-                        ? "text-blue-400"
-                        : msg.type === "credit-card"
-                        ? "text-green-400"
-                        : msg.type === "adjudicator"
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {msg.author}
-                  </span>
-                  <span className="text-xs text-gray-400">{msg.timestamp}</span>
+            <div
+              key={index}
+              className="group"
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-slate-100 font-medium ${getAvatarColor(
+                    msg.type
+                  )}`}
+                >
+                  {msg.author[0].toUpperCase()}
                 </div>
-                <div className="bg-gray-700 text-gray-100 rounded-xl px-5 py-3 mt-1 shadow-md text-left">
-                  {msg.content}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-sm font-medium ${getAuthorColor(msg.type)}`}>
+                      {msg.author}
+                    </span>
+                    <span className="text-xs text-slate-500">{msg.timestamp}</span>
+                  </div>
+                  <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg px-4 py-3 text-slate-200 shadow-sm transition-all duration-200 group-hover:bg-slate-800">
+                    {msg.content}
+                  </div>
                 </div>
               </div>
             </div>
@@ -74,24 +101,30 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({ claimSumm
         </div>
 
         {/* Input Area */}
-        <div className="p-4 bg-gray-800 flex items-center gap-4 border-t border-gray-600 shadow-inner">
-          <input
-            type="text"
-            placeholder="Message #refund-claim"
-            className="flex-1 bg-gray-600 text-gray-200 border-none rounded-md px-4 py-2 shadow focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            className="bg-blue-500 text-white px-5 py-2 rounded-md shadow hover:bg-blue-600 transition"
-          >
-            Send
-          </button>
-          <label
-            htmlFor="file-upload"
-            className="cursor-pointer text-blue-400 hover:underline"
-          >
-            Upload File
-          </label>
-          <input type="file" id="file-upload" className="hidden" />
+        <div className="p-6 bg-slate-900/50 backdrop-blur-sm border-t border-slate-800">
+          <div className="flex gap-4">
+            <input
+              type="text"
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder="Type your message..."
+              className="flex-1 bg-slate-800/50 text-slate-200 rounded-lg px-4 py-3 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200"
+            />
+            <button
+              onClick={handleSendMessage}
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200"
+            >
+              Send
+            </button>
+            <label
+              htmlFor="file-upload"
+              className="flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 px-6 rounded-lg cursor-pointer transition-colors duration-200"
+            >
+              Attach
+            </label>
+            <input type="file" id="file-upload" className="hidden" />
+          </div>
         </div>
       </div>
     </div>
