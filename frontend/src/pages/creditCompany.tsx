@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Claim, CreditCompanyUi } from "../components/CreditCompanyUi";
+import { CreditCompanyUi } from "../components/CreditCompanyUi";
 import { Status, Graph } from "../components/Graph";
 import Navbar from "../components/Navbar";
+import { Claim } from "../types";
 
 export const CreditCompanyPage = () => {
   const [selectedClaimState, setSelectedClaimState] = useState<
