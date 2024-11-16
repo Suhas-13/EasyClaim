@@ -52,9 +52,6 @@ const ClaimSummary: React.FC = () => {
     <div className="bg-slate-900 shadow-xl h-full max-w-2xl mx-auto">
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 text-transparent bg-clip-text">
-            Claim Overview
-          </h2>
           <button
             onClick={addNewEvent}
             disabled={isAnimating}

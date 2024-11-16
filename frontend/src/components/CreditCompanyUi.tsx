@@ -2,15 +2,7 @@ import React from "react";
 import { Status } from "./Graph";
 import Navbar from "./Navbar";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
-
-export interface Claim {
-  id: number;
-  name: string;
-  description: string;
-  documentFiles: string[];
-  status: Status;
-  submissionDate: Date;
-}
+import { Claim } from "../types";
 
 export const CreditCompanyUi = ({
   claims,
