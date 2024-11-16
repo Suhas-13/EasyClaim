@@ -6,6 +6,7 @@ import { CreditCompanyPage } from "./pages/creditCompany";
 import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
 import BankingApp from "./components/BankingApp";
+import Home from "./pages/home";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -73,7 +74,7 @@ const App = () => {
           <Route path="/policyView" element={<PolicyView />} />
 
           <Route
-            path="/refundClaimDiscussion"
+            path="/refundClaimDiscussion/:id"
             element={
               claimDetails && (
                 <RefundClaimDiscussion
@@ -91,6 +92,12 @@ const App = () => {
               />
             }
           />
+          <Route
+            path="/home"
+            element={
+              <Home></Home>
+            }>
+          </Route>
         </Routes>
       </Router>
     </div>
