@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 interface ClaimEvent {
   timestamp: string;
@@ -10,7 +10,11 @@ interface ClaimEvent {
 const ClaimSummary = () => {
   const initialEvents: ClaimEvent[] = [
     { timestamp: "2024-03-15 09:00", description: "Claim Filed", id: 1 },
-    { timestamp: "2024-03-16 14:30", description: "Initial Review Complete", id: 2 }
+    {
+      timestamp: "2024-03-16 14:30",
+      description: "Initial Review Complete",
+      id: 2,
+    },
   ];
 
   const [events, setEvents] = useState<ClaimEvent[]>(initialEvents);
@@ -28,17 +32,17 @@ const ClaimSummary = () => {
       timestamp: new Date().toLocaleString(),
       description: `New Event #${events.length + 1}`,
       id: newEventId,
-      isNew: true // Mark the new event as `isNew`
+      isNew: true, // Mark the new event as `isNew`
     };
 
-    setEvents(prev => [...prev, newEvent]);
+    setEvents((prev) => [...prev, newEvent]);
 
     setTimeout(() => {
       setIsAnimating(false);
-      setEvents(prev => 
-        prev.map(event => ({
+      setEvents((prev) =>
+        prev.map((event) => ({
           ...event,
-          isNew: false // Reset `isNew` for all events after animation
+          isNew: false, // Reset `isNew` for all events after animation
         }))
       );
     }, 1000);
@@ -51,7 +55,7 @@ const ClaimSummary = () => {
           <h2 className="text-2xl font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 text-transparent bg-clip-text">
             Claim Overview
           </h2>
-          <button 
+          <button
             onClick={addNewEvent}
             disabled={isAnimating}
             className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md"
@@ -67,42 +71,43 @@ const ClaimSummary = () => {
         </h3>
         <div className="relative space-y-4">
           {events.map((event, index) => (
-            <div
-              key={event.id}
-              className="relative pl-4"
-            >
+            <div key={event.id} className="relative pl-4">
               {index !== events.length - 1 && (
                 <div className="absolute left-2 top-6 w-0.5 h-full -ml-px bg-indigo-500" />
               )}
 
               {event.isNew && index === events.length - 1 && (
-                <div 
+                <div
                   className="absolute left-2 top-[-16px] w-0.5 -ml-px bg-indigo-500"
                   style={{
-                    height: '26px',
-                    animation: 'growLine 0.5s ease-out forwards',
-                    transformOrigin: 'top',
-                    opacity: 1
+                    height: "26px",
+                    animation: "growLine 0.5s ease-out forwards",
+                    transformOrigin: "top",
+                    opacity: 1,
                   }}
                 />
               )}
 
-              <div 
+              <div
                 className={`
                   absolute left-0 top-2 w-4 h-4 rounded-full border-2 bg-slate-900 border-indigo-500
-                  ${event.isNew ? 'animate-fade-in' : ''}
+                  ${event.isNew ? "animate-fade-in" : ""}
                 `}
                 style={{
                   opacity: event.isNew ? 0 : 1,
-                  animation: event.isNew ? 'fadeIn 0.3s ease-out 0.5s forwards' : 'none'
+                  animation: event.isNew
+                    ? "fadeIn 0.3s ease-out 0.5s forwards"
+                    : "none",
                 }}
               />
-              
-              <div 
+
+              <div
                 className="ml-6"
                 style={{
                   opacity: event.isNew ? 0 : 1,
-                  animation: event.isNew ? 'fadeIn 0.3s ease-out 0.5s forwards' : 'none'
+                  animation: event.isNew
+                    ? "fadeIn 0.3s ease-out 0.5s forwards"
+                    : "none",
                 }}
               >
                 <span className="block text-sm font-medium text-slate-400 mb-1">

@@ -1,5 +1,6 @@
 import React from "react";
 import { Status } from "./Graph";
+import { useNavigate } from "react-router-dom";
 
 export interface Claim {
   id: number;
@@ -17,14 +18,20 @@ export const CreditCompanyUi = ({
   claims: Claim[];
   setClaimStatus: (id: number, status: Status) => void;
 }) => {
-  const viewClaim = React.useCallback((id: number) => null, []);
+  const navigate = useNavigate();
+  const viewClaim = React.useCallback((id: number) => {
+    navigate(`/claim/${id}`);
+  }, []);
 
   return (
     <div className="min-h-screen w-full p-4">
       <h1 className="text-4xl font-bold mb-6 text-center">{`${claims.length} claim(s) found`}</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {claims.map((claim) => (
-          <div key={claim.id} className="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between">
+          <div
+            key={claim.id}
+            className="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between"
+          >
             <div>
               <h2 className="text-2xl font-semibold mb-2">{claim.name}</h2>
               <p className="text-gray-600 mb-4">{claim.description}</p>

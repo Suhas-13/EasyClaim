@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ClaimDetails } from "./types";
-import ClaimSummary from "./ClaimSummary";
+import ClaimSummary from "./components/ClaimSummary";
 
 interface Message {
   content: string;
@@ -51,8 +51,8 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
       {/* Claim Summary */}
       <div className="w-1/3 border-r border-slate-800">
-      {/* claimDetails={claimDetails} */}
-        <ClaimSummary  />
+        {/* claimDetails={claimDetails} */}
+        <ClaimSummary />
       </div>
 
       {/* Discussion Area */}
@@ -61,20 +61,21 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
         <div className="bg-slate-900/50 backdrop-blur-sm p-6 flex items-center justify-between border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-semibold text-slate-100">Claim Discussion</h3>
+              <h3 className="text-xl font-semibold text-slate-100">
+                Claim Discussion
+              </h3>
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-sm text-slate-400 mt-1">Claim ID #{claimDetails.id}</p>
+            <p className="text-sm text-slate-400 mt-1">
+              Claim ID #{claimDetails.id}
+            </p>
           </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 p-6 space-y-6 overflow-y-auto">
           {messages.map((msg, index) => (
-            <div
-              key={index}
-              className="group"
-            >
+            <div key={index} className="group">
               <div className="flex items-start gap-4">
                 <div
                   className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-slate-100 font-medium ${getAvatarColor(
@@ -86,10 +87,16 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-sm font-medium ${getAuthorColor(msg.type)}`}>
+                    <span
+                      className={`text-sm font-medium ${getAuthorColor(
+                        msg.type
+                      )}`}
+                    >
                       {msg.author}
                     </span>
-                    <span className="text-xs text-slate-500">{msg.timestamp}</span>
+                    <span className="text-xs text-slate-500">
+                      {msg.timestamp}
+                    </span>
                   </div>
                   <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg px-4 py-3 text-slate-200 shadow-sm transition-all duration-200 group-hover:bg-slate-800">
                     {msg.content}
