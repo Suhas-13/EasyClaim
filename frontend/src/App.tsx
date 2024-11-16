@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
-import RefundClaimDiscussion from './RefundClaimDiscussion'; // Import RefundClaimDiscussion component
-import './App.css';
+import { useState, useEffect } from "react";
+import RefundClaimDiscussion from "./RefundClaimDiscussion"; // Import RefundClaimDiscussion component
+import "./App.css";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { CreditCardCompanyPage } from "./pages/creditCardPage";
 
 const App = () => {
-  const [claimSummary, setClaimSummary] = useState<string>('');
+  const [claimSummary, setClaimSummary] = useState<string>("");
   const [messages, setMessages] = useState<any[]>([]); // Set initial state for messages
 
   useEffect(() => {
@@ -13,7 +15,8 @@ const App = () => {
 
     setMessages([
       {
-        content: "The refund has been initiated. Please wait 3-5 business days.",
+        content:
+          "The refund has been initiated. Please wait 3-5 business days.",
         type: "credit-card",
         author: "Credit Card Co.",
         timestamp: "10:12 AM",
@@ -25,7 +28,8 @@ const App = () => {
         timestamp: "10:15 AM",
       },
       {
-        content: "The seller needs to approve the refund before we can proceed.",
+        content:
+          "The seller needs to approve the refund before we can proceed.",
         type: "adjudicator",
         author: "Adjudicator",
         timestamp: "10:18 AM",
@@ -41,9 +45,25 @@ const App = () => {
 
   return (
     <div className="App">
-      <RefundClaimDiscussion claimSummary={claimSummary} messages={messages} />
+      <Router>
+        <Routes>
+          <Route
+            path="/creditCardCompany"
+            element={<CreditCardCompanyPage />}
+          />
+          <Route
+            path="/refundClaimDiscussion"
+            element={
+              <RefundClaimDiscussion
+                claimSummary={claimSummary}
+                messages={messages}
+              />
+            }
+          />
+        </Routes>
+      </Router>
     </div>
   );
-}
+};
 
 export default App;
