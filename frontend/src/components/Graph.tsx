@@ -5,7 +5,6 @@ import {
   Edge,
   Background,
   Controls,
-  MiniMap,
   useEdgesState,
   useNodesState,
   NodeMouseHandler,
@@ -26,6 +25,7 @@ export enum Status {
   ClaimApproved = "✅ Claim Approved",
   ClaimRejected = "❌ Claim Rejected",
 }
+
 const initialNodes: Node<NodeProps>[] = [
   {
     id: "1",
