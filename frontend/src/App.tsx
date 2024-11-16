@@ -3,6 +3,7 @@ import RefundClaimDiscussion from "./RefundClaimDiscussion"; // Import RefundCla
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CreditCompanyPage } from "./pages/creditCompany";
+import PolicyView from "./PolicyView";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -67,6 +68,8 @@ const App = () => {
       <Router>
         <Routes>
           <Route path="/creditCompany" element={<CreditCompanyPage />} />
+          <Route path="/policyView" element={<PolicyView />} />
+
           <Route
             path="/refundClaimDiscussion"
             element={
