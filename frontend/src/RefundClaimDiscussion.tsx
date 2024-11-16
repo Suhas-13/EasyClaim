@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ClaimDetails } from "./types";
-import ClaimSummary from "./ClaimSummary";
 import Navbar from "./components/Navbar";
+import ClaimSummary from "./components/ClaimSummary";
 
 interface Message {
   content: string;
@@ -50,7 +50,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
   return (
     <div>
-      <Navbar></Navbar>
+      <Navbar />
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
         {/* Claim Summary */}
         <div className="w-1/3 border-r border-slate-800">
@@ -79,7 +79,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
                       </span>
                       <span className="text-xs text-slate-500">{msg.timestamp}</span>
                     </div>
-                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg px-4 py-3 text-slate-200 shadow-sm transition-all duration-200 group-hover:bg-slate-800">
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg px-4 py-3 text-slate-200 shadow-sm transition-all duration-200 group-hover:bg-slate-800 text-left">
                       {msg.content}
                     </div>
                   </div>
