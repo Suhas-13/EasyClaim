@@ -96,7 +96,7 @@ required_fields = [
     {'id': 'issue_description', 'question': 'Please describe the issue you are experiencing.', 'field': 'issue_description', 'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other']},
     {'id': 'item_name', 'question': 'Please provide the name of the item or service.', 'field': 'item_name'},
     {'id': 'have_contacted_seller', 'question': 'Have you contacted the merchant about this issue?', 'field': 'have_contacted_seller', 'options': ['Yes', 'No']},
-    {'id': 'shipping_info', 'question': 'Please provide any shipping information (tracking number or shipping link) if available.', 'field': 'shipping_info', 'optional': True, 'condition': lambda answers: answers.get('issue_description') == 'Item not received'},
+    {'id': 'shipping_info', 'question': 'Please provide any shipping information (tracking number or shipping link) if available.', 'field': 'shipping_info', 'optional': True, 'condition': 'The item is not a service and the issue is that the item was not received.'},
 ]
 
 @app.before_request
@@ -160,7 +160,28 @@ def index():
 @app.route('/start_new_claim')
 def start_new_claim():
     session.pop('current_claim_id', None)
-    return redirect(url_for('index'))
+    # Create a new claim and redirect to its chat window
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    if not user:
+        return redirect(url_for('load_user'))
+
+    # Create a new claim
+    claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
+    db.session.add(claim)
+    db.session.commit()
+    session['current_claim_id'] = claim.id
+    
+    session['transaction_details'] = {
+        'transaction_name': 'Purchase at ABC Store',
+        'date': '2023-10-15',
+        'merchant_name': 'ABC Store',
+        'merchant_email': 'merchant@example.com',
+        'transaction_id': 'TX1234567890'
+    }
+
+    # Redirect to the claim chat window
+    return redirect(url_for('view_claim', claim_id=claim.id))
 
 @app.route('/claim/<int:claim_id>')
 def view_claim(claim_id):
@@ -171,6 +192,7 @@ def view_claim(claim_id):
 
     # Get the claim
     claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    
     if not claim:
         return 'Claim not found or you do not have access to it.', 404
 
@@ -186,6 +208,7 @@ def get_messages(claim_id):
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).first()
     claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    print(claim.messages)
     if not claim:
         return jsonify({'error': 'Unauthorized access or claim not found.'}), 403
 
@@ -201,39 +224,25 @@ def handle_connect():
     if not user:
         return
 
-    # Check if a claim is already in progress
+    # Get the current claim ID from the session
     claim_id = session.get('current_claim_id')
     if not claim_id:
-        # Check for incomplete claims
-        incomplete_claim = Claim.query.filter_by(user_id=user.id, status='In Progress').first()
-        if incomplete_claim:
-            claim = incomplete_claim
-            session['current_claim_id'] = claim.id
-        else:
-            # Create a new claim
-            claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
-            db.session.add(claim)
-            db.session.commit()
-            session['current_claim_id'] = claim.id
+        # No claim in session; do nothing
+        return
     else:
         claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
         if not claim:
-            # Claim not found, create a new one
-            claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
-            db.session.add(claim)
-            db.session.commit()
-            session['current_claim_id'] = claim.id
+            # Claim not found; do nothing
+            return
 
     # Check if the chat is locked
     if claim.chat_locked:
         emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
         return
 
-    # Get transaction details from the client
-    transaction_details_json = request.args.get('transaction_details')
-    if transaction_details_json:
-        transaction_details = json.loads(transaction_details_json)
-    else:
+    # Get transaction details from the client (if needed)
+    transaction_details = session.get('transaction_details')
+    if not transaction_details:
         # For testing, use default transaction details
         transaction_details = {
             'transaction_name': 'Purchase at ABC Store',
@@ -243,14 +252,14 @@ def handle_connect():
             'transaction_id': 'TX1234567890'
         }
 
-    session['transaction_details'] = transaction_details
-
-    # Do not emit previous messages here to prevent duplicates
-
     # If the claim is already completed, do not ask questions
     if claim.state == ClaimState.COMPLETED.value:
         return
 
+    # go through and send all the messages
+    for message in claim.messages:
+        emit('message', {'text': message.content})
+        
     # If there is a current question, resume from there
     if claim.current_question:
         ask_next_question(claim)
@@ -296,9 +305,7 @@ You are disputing the following transaction:
 def is_question_redundant(claim, field):
     # Check if the question is not relevant based on previous answers
     answers = json.loads(claim.answers)
-    condition = field.get('condition')
-    if condition and not condition(answers):
-        return True  # The question is redundant
+                
     # Check if the question has already been answered in previous responses
     # Fetch previous messages
     messages_db = Message.query.filter_by(claim_id=claim.id).order_by(Message.timestamp).all()
@@ -315,7 +322,29 @@ def is_question_redundant(claim, field):
     # Add the conversation history
     messages.extend(conversation)
     # Add the final assistant prompt
-    assistant_prompt = f"Has the user already provided an answer to the following question: '{question}'? Respond with 'Yes' or 'No' in JSON format: {{\"answered\": \"Yes\" or \"No\"}}"
+    assistant_prompt = f"Has the user already provided enough information to answer the following question: '{question}'? Respond with 'Yes' or 'No' in JSON format: {{\"answered\": \"Yes\" or \"No\"}}"
+    
+    condition = field.get('condition')
+    if condition:
+        condition_messages = messages.copy()
+        condition_prompt = "Please answer in JSON format whether the condition is true based on the previous messages: {'answer': true} \n" + condition
+        condition_messages.append({'role': 'assistant', 'content': condition_prompt})
+        # evaluate if the condition is met
+        try:
+            response = client.chat.completions.create(model="gpt-4o",
+            messages=condition_messages,
+            max_tokens=50,
+            temperature=0.0,
+            response_format={ "type": "json_object" })
+            result = json.loads(response.choices[0].message.content.strip())
+            condition_met = result.get('answer', True)
+        except Exception as e:
+            print(f"Error in is_question_redundant: {e}")
+            condition_met = True
+        
+        if not condition_met:
+            return True
+        
     messages.append({'role': 'assistant', 'content': assistant_prompt})
     # Call GPT-4 API
     try:
@@ -396,6 +425,10 @@ def ask_next_question(claim):
                 continue  # Proceed to the next question
             else:
                 # Ask this question
+                
+                if field['question'] == claim.messages[-1].content:
+                    return
+                
                 emit('message', {'text': field['question']})
 
                 # Save assistant message
@@ -433,8 +466,8 @@ def handle_user_response(data):
         return
 
     # Check if the chat is locked
-    if claim.chat_locked:
-        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
+    if claim.status == 'Pending':
+        emit('message', {'text': 'This claim has already been submitted and is awaiting further action.'})
         return
 
     current_question = claim.current_question
@@ -465,6 +498,7 @@ def handle_user_response(data):
     claim.answers = json.dumps(answers)
     db.session.commit()
 
+    
     # Validate the response with GPT-4
     field = required_fields[claim.question_index]
     validation_result = validate_response_with_gpt4(claim.id, field['question'], user_response)
@@ -597,7 +631,7 @@ def create_claim():
     claim.structured_data = json.dumps(structured_data)
     claim.status = 'Pending'
     claim.state = ClaimState.COMPLETED.value
-    claim.chat_locked = False  # Do not lock the chat immediately
+
     claim.current_question = None  # Reset current question
     claim.question_index = None
     db.session.commit()
