@@ -1,6 +1,6 @@
 import React from "react";
 import { Status } from "./Graph";
-import { useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
 
 export interface Claim {
   id: number;
@@ -18,63 +18,73 @@ export const CreditCompanyUi = ({
   claims: Claim[];
   setClaimStatus: (id: number, status: Status) => void;
 }) => {
-  const navigate = useNavigate();
-  const viewClaim = React.useCallback((id: number) => {
-    navigate(`/claim/${id}`);
-  }, []);
+  const viewClaim = React.useCallback((id: number) => null, []);
 
   return (
-    <div className="min-h-screen w-full p-4">
-      <h1 className="text-4xl font-bold mb-6 text-center">{`${claims.length} claim(s) found`}</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {claims.map((claim) => (
-          <div
-            key={claim.id}
-            className="bg-white shadow-lg rounded-lg p-6 flex flex-col justify-between"
-          >
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">{claim.name}</h2>
-              <p className="text-gray-600 mb-4">{claim.description}</p>
-              <p className="text-gray-800 mb-2">
-                <strong>Status:</strong> {claim.status}
-              </p>
-              <p className="text-gray-800 mb-4">
-                <strong>Submission Date:</strong>{" "}
-                {claim.submissionDate.toDateString()}
-              </p>
-              <div className="mb-4">
-                <h3 className="text-xl font-semibold mb-2">Documents:</h3>
-                <ul className="list-disc list-inside">
-                  {claim.documentFiles.map((file, index) => (
-                    <li key={index} className="text-gray-700">
-                      {file}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <div className="flex space-x-4 mt-4">
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                onClick={() => viewClaim(claim.id)}
-              >
-                View
-              </button>
-              <button
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                onClick={() => setClaimStatus(claim.id, Status.ClaimApproved)}
-              >
-                Approve
-              </button>
-              <button
-                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                onClick={() => setClaimStatus(claim.id, Status.ClaimRejected)}
-              >
-                Reject
-              </button>
-            </div>
+    <div>
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 font-sans p-8 min-w-[300px]">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h3 className="text-2xl font-semibold text-slate-100">Claims</h3>
+            <p className="text-slate-400 mt-2">{`${claims.length} claim(s) found`}</p>
           </div>
-        ))}
+
+          {/* Claims Table */}
+          <div className="overflow-x-auto bg-slate-800/30 rounded-xl shadow-lg">
+            <table className="min-w-full table-auto text-left text-slate-200">
+              <thead>
+                <tr className="bg-slate-700/50 text-sm font-semibold text-slate-100">
+                  <th className="px-6 py-3">Claim Name</th>
+                  <th className="px-6 py-3">Description</th>
+                  <th className="px-6 py-3">Submission Date</th>
+                  <th className="px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map((claim) => (
+                  <tr
+                    key={claim.id}
+                    className="hover:bg-slate-700/50 transition-all duration-200"
+                  >
+                    <td className="px-6 py-4">{claim.name}</td>
+                    <td className="px-6 py-4 text-slate-300">{claim.description}</td>
+                    <td className="px-6 py-4 text-xs text-slate-500 bg-slate-800/50">
+                      {claim.submissionDate.toDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex space-x-2">
+                        {/* View Button */}
+                        <button
+                          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md"
+                          onClick={() => viewClaim(claim.id)}
+                        >
+                          View
+                        </button>
+
+                        {/* Approve Button */}
+                        <button
+                          className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
+                          onClick={() => setClaimStatus(claim.id, Status.ClaimApproved)}
+                        >
+                          Approve
+                        </button>
+
+                        {/* Reject Button */}
+                        <button
+                          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md"
+                          onClick={() => setClaimStatus(claim.id, Status.ClaimRejected)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
