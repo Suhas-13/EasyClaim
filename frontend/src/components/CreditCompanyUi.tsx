@@ -1,6 +1,7 @@
 import React from "react";
 import { Status } from "./Graph";
 import Navbar from "./Navbar";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 
 export interface Claim {
   id: number;
@@ -18,7 +19,12 @@ export const CreditCompanyUi = ({
   claims: Claim[];
   setClaimStatus: (id: number, status: Status) => void;
 }) => {
-  const viewClaim = React.useCallback((id: number) => null, []);
+  const navigate = useNavigate(); // Initialize navigate
+
+  // Modify the viewClaim function to navigate to /policyView with the claim's ID
+  const viewClaim = React.useCallback((id: number) => {
+    navigate(`/refundClaimDiscussion/${id}`); // Redirect to /policyView with claim id
+  }, [navigate]);
 
   return (
     <div>
@@ -57,7 +63,7 @@ export const CreditCompanyUi = ({
                         {/* View Button */}
                         <button
                           className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md"
-                          onClick={() => viewClaim(claim.id)}
+                          onClick={() => viewClaim(claim.id)} // This now navigates
                         >
                           View
                         </button>
