@@ -30,7 +30,7 @@ export const CreditCompanyUi = ({
   return (
     <div className="min-h-3">
       <Typography variant="h4" component="h1" gutterBottom>
-        Credit Company Claims
+        {`${claims.length} claim(s) found`}
       </Typography>
       {claims.map((claim) => (
         <Card key={claim.id} variant="outlined" sx={{ marginBottom: 2 }}>

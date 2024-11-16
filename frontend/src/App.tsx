@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import RefundClaimDiscussion from "./RefundClaimDiscussion"; // Import RefundClaimDiscussion component
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { CreditCardCompanyPage } from "./pages/creditCardPage";
+import { CreditCompanyPage } from "./pages/creditCompany";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -16,9 +16,18 @@ const App = () => {
       description: "Refund claim due to delayed shipment of product XYZ.",
       events: [
         { timestamp: "2024-11-01", description: "Claim filed by user." },
-        { timestamp: "2024-11-01", description: "Refund initiation started by Credit Card Co." },
-        { timestamp: "2024-11-01", description: "Seller approval received for refund." },
-        { timestamp: "2024-11-02", description: "Adjudicator review completed. Pending refund approval." },
+        {
+          timestamp: "2024-11-01",
+          description: "Refund initiation started by Credit Card Co.",
+        },
+        {
+          timestamp: "2024-11-01",
+          description: "Seller approval received for refund.",
+        },
+        {
+          timestamp: "2024-11-02",
+          description: "Adjudicator review completed. Pending refund approval.",
+        },
       ],
     });
 
@@ -57,10 +66,7 @@ const App = () => {
     <div className="App">
       <Router>
         <Routes>
-          <Route
-            path="/creditCardCompany"
-            element={<CreditCardCompanyPage />}
-          />
+          <Route path="/creditCompany" element={<CreditCompanyPage />} />
           <Route
             path="/refundClaimDiscussion"
             element={
