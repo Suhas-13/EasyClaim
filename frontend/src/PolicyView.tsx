@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Upload } from "lucide-react";
+import Navbar from "./components/Navbar";
 
 interface Policy {
   id: number;
@@ -51,8 +52,12 @@ const PolicyView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 font-sans p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-200 font-sans">
+      {/* Navbar */}
+      <Navbar />
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
           <h3 className="text-2xl font-semibold text-slate-100">Policy View</h3>

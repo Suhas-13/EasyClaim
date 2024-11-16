@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CreditCompanyPage } from "./pages/creditCompany";
 import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
+import BankingApp from "./components/BankingApp";
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
@@ -83,6 +84,13 @@ const App = () => {
             }
           />
           <Route path="/claim/:id" element={<Claim />} />
+          <Route
+            path="/bankingApp"
+            element={
+              claimDetails && <BankingApp
+              />
+            }
+          />
         </Routes>
       </Router>
     </div>

@@ -7,7 +7,7 @@ interface ClaimEvent {
   isNew?: boolean; // Add isNew property, which is optional for old events
 }
 
-const ClaimSummary = () => {
+const ClaimSummary: React.FC = () => {
   const initialEvents: ClaimEvent[] = [
     { timestamp: "2024-03-15 09:00", description: "Claim Filed", id: 1 },
     {
