@@ -43,6 +43,7 @@ class ClaimState(Enum):
     START = 'START'
     COLLECTING_INFO = 'COLLECTING_INFO'
     UPLOADING_EVIDENCE = 'UPLOADING_EVIDENCE'
+    ADDITIONAL_INFO = 'ADDITIONAL_INFO'
     FINALIZING = 'FINALIZING'
     COMPLETED = 'COMPLETED'
 
@@ -111,7 +112,7 @@ def load_user():
         db.session.commit()
     else:
         # User UUID exists, retrieve the user
-        user = User.query.filter_by(user_uuid=user_uuid).first()
+        user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
         if not user:
             # User not found in database, create a new user
             user = User(user_uuid=user_uuid)
@@ -121,7 +122,7 @@ def load_user():
 @app.route('/login/<user_uuid>')
 def login(user_uuid):
     # Check if the user exists
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     if user:
         # Set the user_uuid in the session
         session['user_uuid'] = user_uuid
@@ -137,7 +138,7 @@ def login(user_uuid):
 @app.route('/')
 def index():
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     if not user:
         return redirect(url_for('load_user'))
 
@@ -162,7 +163,7 @@ def start_new_claim():
     session.pop('current_claim_id', None)
     # Create a new claim and redirect to its chat window
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     if not user:
         return redirect(url_for('load_user'))
 
@@ -187,12 +188,12 @@ def start_new_claim():
 @app.route('/claim/<int:claim_id>')
 def view_claim(claim_id):
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     if not user:
         return redirect(url_for('load_user'))
 
     # Get the claim
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     
     if not claim:
         return 'Claim not found or you do not have access to it.', 404
@@ -207,8 +208,8 @@ def view_claim(claim_id):
 @app.route('/get_messages/<int:claim_id>', methods=['GET'])
 def get_messages(claim_id):
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     print(claim.messages)
     if not claim:
         return jsonify({'error': 'Unauthorized access or claim not found.'}), 403
@@ -224,9 +225,9 @@ def get_all_messages():
         return
     
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     for message in claim.messages:
         emit('message', {'text': message.content})
 
@@ -234,7 +235,7 @@ def get_all_messages():
 def handle_connect():
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     if not user:
         return
 
@@ -245,7 +246,7 @@ def handle_connect():
         # No claim in session; do nothing
         return
     else:
-        claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+        claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
         if not claim:
             # Claim not found; do nothing
             return
@@ -460,24 +461,25 @@ def ask_next_question(claim):
     db.session.commit()
     emit('message', {'text': 'Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".'})
 
-    # Save assistant message
-    message = Message(claim_id=claim.id, sender='assistant', content='Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".')
-    db.session.add(message)
-    db.session.commit()
 
 @socketio.on('user_response')
 def handle_user_response(data):
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     if not claim:
         return
 
     # Check if the chat is locked
-    if claim.status == 'Pending':
+    if claim.state == ClaimState.COMPLETED.value:
         emit('message', {'text': 'This claim has already been submitted and is awaiting further action.'})
+        return
+    
+    if claim.state == ClaimState.ADDITIONAL_INFO.value:
+        emit('message', {'text': 'Thank you for providing additional information. We will review the information and get back to you.'})
+        create_claim()
         return
 
     current_question = claim.current_question
@@ -497,10 +499,13 @@ def handle_user_response(data):
     db.session.commit()
 
     
+    if claim.question_index is None:
+        emit('message', {'text': 'Please wait for the claim to be processed.'})
     # Validate the response with GPT-4
     if claim.question_index > len(required_fields) - 1:
         if current_question == 'evidence_available' and 'done' in user_response.lower():
             create_claim()
+            return
         else:
             emit('message', {'text': 'Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".'})
     
@@ -572,9 +577,9 @@ def validate_response_with_gpt4(claim_id, question_text, user_response):
 def handle_file_chunk(data):
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     if not claim:
         emit('message', {'text': 'Claim not found.'}, room=session_id)
         return
@@ -618,19 +623,24 @@ def handle_file_chunk(data):
             filepath=final_file_path,
             filetype=mimetypes.guess_type(filename)[0]
         )
+        
+        file_upload_message = f'File "{filename}" uploaded successfully.'
+        file_message = Message(claim_id=claim.id, sender='user', content=file_upload_message)
+        db.session.add(file_message)
+        
         db.session.add(file_record)
         db.session.commit()
 
         # Notify client of successful upload
         emit('message', {'text': f'File "{filename}" uploaded successfully.'}, room=session_id)
-        emit('Please upload any additional files or type "Done" when you are finished.', room=session_id)
+        emit('message', {'text': 'Please upload any additional files or type "Done" when you are finished.'}, room=session_id)
         
 def create_claim():
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).first()
+    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     if not claim:
         return
 
@@ -676,31 +686,23 @@ def create_claim():
 
 def run_expert_reviews(claim_id, user_uuid):
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
 
     structured_data = json.loads(claim.structured_data)
 
-    # Shipping expert review
-    shipping_feedback = shipping_expert_review(structured_data)
     # Chargeback policies expert review
     chargeback_feedback = chargeback_policies_expert_review(structured_data)
-
-    expert_feedback = {
-        'shipping': shipping_feedback,
-        'chargeback': chargeback_feedback
-    }
+    print(chargeback_feedback)
+    
+    expert_feedback = [chargeback_feedback]
     claim.expert_feedback = json.dumps(expert_feedback)
     db.session.commit()
 
     # Check if any follow-ups are needed
     follow_up_needed = False
     follow_up_messages = []
-
-    if shipping_feedback.get('action') == 'request_additional_info':
-        follow_up_needed = True
-        follow_up_messages.append(shipping_feedback['additional_info_needed'])
 
     if chargeback_feedback.get('action') == 'request_additional_info':
         follow_up_needed = True
@@ -716,16 +718,17 @@ def run_expert_reviews(claim_id, user_uuid):
     if follow_up_needed and session_id:
         # Send follow-up messages to the user
         for msg in follow_up_messages:
-            emit('message', {'text': msg}, room=session_id)
+            emit('message', {'text': "ADDITIONAL INFORMATION REQUIRED: Additional information is required to process your claim: " + msg}, room=session_id)
             # Save assistant message to chat history
-            message = Message(claim_id=claim.id, sender='assistant', content=msg)
+            message = Message(claim_id=claim.id, sender='assistant', content= "ADDITIONAL INFORMATION REQUIRED: Additional information is required to process your claim: " + msg)
             db.session.add(message)
             db.session.commit()
         # Set the claim status back to 'In Progress'
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
         claim.status = 'Follow-Up Needed'
-        claim.state = ClaimState.COLLECTING_INFO.value
+        claim.state = ClaimState.ADDITIONAL_INFO.value
         db.session.commit()
-    elif shipping_feedback.get('action') == 'wait' and session_id:
+    elif chargeback_feedback.get('action') == 'wait' and session_id:
         # Inform the user to wait
         wait_message = 'Please wait for 10 days past the expected delivery date. If the item has not arrived by then, please let us know.'
         emit('message', {'text': wait_message}, room=session_id)
@@ -734,6 +737,7 @@ def run_expert_reviews(claim_id, user_uuid):
         db.session.add(message)
         db.session.commit()
         claim.status = 'Waiting'
+        claim.state = ClaimState.COLLECTING_INFO.value
         db.session.commit()
     else:
         # Proceed to send claim to merchant
@@ -741,7 +745,7 @@ def run_expert_reviews(claim_id, user_uuid):
 
 def send_claim_to_merchant(claim_id):
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
 
@@ -765,7 +769,7 @@ def send_email(to_email, subject, body):
 @app.route('/merchant_view/<int:claim_id>')
 def merchant_view(claim_id):
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return 'Claim not found.', 404
     structured_data = json.loads(claim.structured_data)
@@ -779,7 +783,7 @@ def merchant_connect(data):
         return
     claim_id = int(claim_id)
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         emit('error', {'message': 'Invalid claim ID.'})
         return
@@ -795,7 +799,7 @@ def merchant_response(data):
         return
     claim_id = int(claim_id)
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         emit('error', {'message': 'Invalid claim ID.'})
         return
@@ -811,7 +815,7 @@ def merchant_response(data):
 
 def perform_final_adjudication(claim_id):
     with app.app_context():
-        claim = Claim.query.get(claim_id)
+        claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
 
