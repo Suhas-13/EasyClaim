@@ -112,7 +112,7 @@ Additional Information:
     try:
         structured_data = json.loads(structured_summary)
         shipping_info = shipping_expert_review(messages, structured_data)
-        structured_data["tracking_info"] = {"data": shipping_info}
+        structured_data["tracking_info"] = {"data": str(shipping_info)}
         print(structured_data   )
     except json.JSONDecodeError:
         structured_data = {}
@@ -203,7 +203,7 @@ def call_shipping_api(provider, tracking_number):
             }
     
     if not tracking_info:
-        return {"error": f"No tracking information found for provider '{provider}' and tracking number '{tracking_number}'."}
+        return {"data": "", "error": f"No tracking information found for provider '{provider}' and tracking number '{tracking_number}'."}
     
     return tracking_info
 
@@ -246,18 +246,18 @@ Tracking provider can be one of the following: "UPS", "FedEx", "USPS", "DHL", "O
     
     # Step 2: Validate extracted details
     if not provider or not tracking_number or provider.lower() not in ["ups", "fedex", "usps", "dhl", "other"]:
-        return {"error": "Tracking provider and tracking number is missing."}
+        return {"data": "", "error": "Tracking provider and tracking number is missing."}
 
     if not provider:
-        return {"error": "Tracking provider is missing."}
+        return {"data": "", "error": "Tracking provider is missing."}
 
     if not tracking_number:
-        return {"error": "Tracking number is missing."}
+        return {"data": "", "error": "Tracking number is missing."}
 
     # Step 3: Call the mock shipping API
     tracking_info = call_shipping_api(provider, tracking_number)
     if not tracking_info or "error" in tracking_info:
-        return {"error": "Unable to retrieve shipping information from the tracking API."}
+        return {"data": "", "error": "Unable to retrieve shipping information from the tracking API."}
 
     shipped = "Yes" if tracking_info["shipped"] else "No"
     delivered = "Yes" if tracking_info["delivered"] else "No"
