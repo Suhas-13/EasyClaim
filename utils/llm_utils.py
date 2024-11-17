@@ -129,9 +129,11 @@ Claim Data:
 
 Based on the dispute category "{structured_data.get('dispute_category', '')}", evaluate the claim according to the following policies:
 
-- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". However, this is only if there is evidence of the delivery date. If the delivery date is unknown this must be provided first through a request_for_information. The customer must provide proof of having attempted to contact the seller.
+- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". However, this is only if there is evidence of the delivery date. If the delivery date is unknown this must be provided first through a request_for_information. If the expected delivery date is in additional_notes then it should not be asked for. The customer must provide proof of having attempted to contact the seller.
 - **Item damaged**: The customer should provide a description of the damage and evidence such as photos. The customer must provide proof of having attempted to contact the seller.
 - **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date and must provide a detailed explanation of when they realized the transaction was unauthorized and why.
+- **Order that is late but eventually arrived**: These orders are not eligible for a chargeback if the order eventually arrived.
+- **Other**: The customer must provide a detailed explanation of the issue and any relevant evidence.
 
 Determine if the claim complies with the policies. If not, specify what additional information is needed.
 
