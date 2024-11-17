@@ -64,13 +64,11 @@ User Responses:
             image_base64 = base64.b64encode(file['data']).decode('utf-8')
             messages.append({
                 "role": "user",
-                "content": f"Attached is an image file named {file_name}. Please analyze it and include any relevant details in the evidence summary."
-            })
-            # Attach the image as base64
-            messages.append({
-                "role": "user",
-                "content": f"Image base64 data: {image_base64}"
-            })
+                "content": [{"type": "text", "text": f"Attached is an image file named {file_name}. Please analyze it and include any relevant details in the evidence summary."}, {
+                "type": "image_url",
+                "image_url": {
+                "url":  f"data:image/jpeg;base64,{image_base64}",
+                }}]})
         elif file_type == 'application/pdf':
             # Extract text from PDF
             pdf_text = ""

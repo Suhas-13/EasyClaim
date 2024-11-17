@@ -91,8 +91,8 @@ with app.app_context():
 
 # Define the required fields for the claim
 required_fields = [
-    {'id': 'item_or_service', 'question': 'Is the dispute about an item or a service?', 'field': 'item_or_service', 'options': ['Item', 'Service']},
     {'id': 'issue_description', 'question': 'Please describe the issue you are experiencing.', 'field': 'issue_description', 'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other']},
+    {'id': 'item_or_service', 'question': 'Is the dispute about an item or a service?', 'field': 'item_or_service', 'options': ['Item', 'Service']},
     {'id': 'item_name', 'question': 'Please provide the name of the item or service.', 'field': 'item_name'},
     {'id': 'have_contacted_seller', 'question': 'Have you contacted the merchant about this issue?', 'field': 'have_contacted_seller', 'options': ['Yes', 'No']},
     {'id': 'shipping_info', 'question': 'Please provide any shipping information (tracking number or shipping link) if available.', 'field': 'shipping_info', 'optional': True, 'condition': 'The item is not a service and the issue is that the item was not received.'},
@@ -499,8 +499,10 @@ def handle_user_response(data):
     
     # Validate the response with GPT-4
     if claim.question_index > len(required_fields) - 1:
-        create_claim()
-        return
+        if current_question == 'evidence_available' and 'done' in user_response.lower():
+            create_claim()
+        else:
+            emit('message', {'text': 'Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".'})
     
     field = required_fields[claim.question_index]
     validation_result = validate_response_with_gpt4(claim.id, field['question'], user_response)
@@ -621,8 +623,7 @@ def handle_file_chunk(data):
 
         # Notify client of successful upload
         emit('message', {'text': f'File "{filename}" uploaded successfully.'}, room=session_id)
-    else:
-        emit('message', {'text': f'Chunk {chunk_index + 1}/{total_chunks} of file "{filename}" uploaded successfully.'}, room=session_id)
+        emit('Please upload any additional files or type "Done" when you are finished.', room=session_id)
         
 def create_claim():
     session_id = request.sid
