@@ -83,12 +83,12 @@ const App = () => {
           <Route path="/creditCompany" element={<CreditCompanyPage />} />
           <Route path="/policyView" element={<PolicyView />} />
           <Route
-            path="/refundClaimDiscussion/:id"
+            path="/claim/:id"
             element={<RefundClaimDiscussionWrapper claimDetails={claimDetails} client={client} />}
           />
           <Route path="/claim/:id" element={<Claim />} />
           <Route
-            path="/bankingApp"
+            path="/bank"
             element={(claimDetails && client) ? <BankingApp client={client}/> : <div>Loading...</div>}
           />
           <Route path="/home" element={<Home />} />

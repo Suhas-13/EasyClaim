@@ -6,7 +6,7 @@ import ChargebackClient from "./FrontendIntegration";
 
 interface Message {
   content: string;
-  type: "user" | "credit-card" | "adjudicator" | "seller";
+  type: "User" | "credit-card" | "Dispute Assistant" | "seller";
   author: string;
   timestamp: string;
 }
@@ -18,13 +18,13 @@ interface RefundClaimDiscussionProps {
 }
 
 const getType = (sender: string): string => {
-  if (sender === "user") {
-    return "user";
+  if (sender === "User") {
+    return "User";
   }
-  if (sender === "assistant") {
-    return "adjudicator";
+  if (sender === "Dispute Assistant") {
+    return "Dispute Assistant";
   }
-  return "user";
+  return "User";
 };
 
 const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
@@ -54,7 +54,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
           {
             content: `File "${file.name}" uploaded successfully.`,
             author: "You",
-            type: "user",
+            type: "User",
             timestamp: new Date().toISOString(),
           },
         ]);
@@ -66,7 +66,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
           {
             content: `Failed to upload file "${file.name}".`,
             author: "You",
-            type: "user",
+            type: "User",
             timestamp: new Date().toISOString(),
           },
         ]);
@@ -118,8 +118,8 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
         
         return [...prevMessages, {
           content: newMessage.text || "",
-          author: "adjudicator",
-          type: "adjudicator",
+          author: "Dispute Assistant",
+          type: "Dispute Assistant",
           timestamp: new Date().toISOString(),
         }];
       });
@@ -139,7 +139,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     if (messageInput.trim()) {
       const newMessage = {
         author: "You",
-        type: "user" as const,
+        type: "User" as const,
         timestamp: new Date().toISOString(),
         content: messageInput,
       };
@@ -166,9 +166,9 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
   const getAuthorColor = (type: Message["type"]) => {
     const colors = {
-      user: "text-cyan-400",
+      User: "text-cyan-400",
       "credit-card": "text-emerald-400",
-      adjudicator: "text-amber-400",
+      "Dispute Assistant": "text-amber-400",
       seller: "text-rose-400",
     };
     return colors[type];
@@ -176,9 +176,9 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
   const getAvatarColor = (type: Message["type"]) => {
     const colors = {
-      user: "bg-cyan-500",
+      User: "bg-cyan-500",
       "credit-card": "bg-emerald-500",
-      adjudicator: "bg-amber-500",
+      "Dispute Assistant": "bg-amber-500",
       seller: "bg-rose-500",
     };
     return colors[type];
