@@ -50,7 +50,35 @@
         var sendButton = document.getElementById('send-button');
         var fileInput = document.getElementById('file-input');
         var uploadButton = document.getElementById('upload-button');
+        
+        function fetchMessages(claimId) {
+            fetch('/get_messages/' + claimId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        appendMessage('System: ' + data.error);
+                        return;
+                    }
+                    var messages = data.messages;
+                    var claimSummary = data.claim_summary;
 
+                    // Render messages
+                    messages.forEach(function(msg) {
+                        var sender = msg.sender === 'user' ? 'You' : 'Assistant';
+                        appendMessage(sender + ': ' + msg.content);
+                    });
+
+                    // Render claim summary if available
+                    if (claimSummary) {
+                        displayClaimSummary(claimSummary);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching messages:', error);
+                    appendMessage('System: Error fetching messages.');
+                });
+        }
+        
         socket.on('connect', function() {
             console.log('Connected to server');
         });
