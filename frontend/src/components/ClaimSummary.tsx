@@ -134,8 +134,6 @@ const ClaimSummary: React.FC<Props> = ({ data }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DetailRow icon="💰" label="Amount" value={transaction_details.amount} />
           <DetailRow icon="🏪" label="Merchant" value={transaction_details.merchant_name} />
-          <DetailRow icon="📧" label="Email" value={transaction_details.merchant_email} />
-          <DetailRow icon="👤" label="User ID" value={transaction_details.user_id} />
         </div>
 
         <DetailRow icon="📝" label="Issue Description" value={transaction_details.issue_description} />
@@ -176,21 +174,14 @@ const ClaimSummary: React.FC<Props> = ({ data }) => {
             {events.map((event, index) => (
               <div key={event.id} className="relative pl-6">
                 {index !== events.length - 1 && (
-                  <div className="absolute left-2.5 top-[1.65rem] w-0.5 h-full -ml-px bg-pink-500/20" />
+                  <div className="absolute left-2.5 top-[1.65rem] w-0.5 h-full -ml-px bg-pink-500/60" />
                 )}
-                <div 
-                  className={`
-                    absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 
-                    rounded-full border-2 border-pink-500 
-                    ${event.isNew ? 'animate-ping bg-pink-500' : 'bg-slate-900'}
-                  `} 
-                />
                 <div className={`
                   pl-6 py-3 bg-slate-800/50 rounded-lg backdrop-blur-sm 
                   transition-all duration-200 
-                  ${event.isNew ? 'ring-2 ring-pink-500 ring-opacity-50' : ''}
+                  ${event.isNew ? 'ring-4 ring-pink-600 ring-opacity-60' : 'border-4 border-pink-600'}
                 `}>
-                  <div className="text-sm text-pink-400">{event.timestamp}</div>
+                  <div className="text-sm text-pink-600">{event.timestamp}</div>
                   <p className="text-slate-200 mt-1">{event.description}</p>
                 </div>
               </div>
