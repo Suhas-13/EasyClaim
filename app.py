@@ -224,7 +224,7 @@ def get_messages(claim_id):
     messages = Message.query.filter_by(claim_id=claim_id).order_by(Message.timestamp).all()
     messages_list = [{'sender': msg.sender, 'content': msg.content, 'timestamp': msg.timestamp.isoformat()} for msg in messages]
     # check if message was created in the last 5 seconds, if so, exclude
-    if messages_list and messages_list[-1]['timestamp'] > datetime.now() - timedelta(seconds=5):
+    if messages_list and datetime.fromisoformat(messages_list[-1]['timestamp']) > datetime.now() - timedelta(seconds=5):
         messages_list = []
     return jsonify({'messages': messages_list, 'claim_summary': claim.claim_summary})
 
@@ -548,8 +548,26 @@ def handle_user_response(data):
         db.session.add(assistant_message)
         db.session.commit()
 
-    # Generate the claim summary
-    # Remove generate_claim_summary, as we're using generate_structured_summary in create_claim
+    answers = json.loads(claim.answers)
+    transaction_details = session.get('transaction_details', {})
+
+    # Get files associated with the claim
+    files = []
+    file_records = File.query.filter_by(claim_id=claim.id).all()
+    for file_record in file_records:
+        with open(file_record.filepath, 'rb') as f:
+            file_data = f.read()
+            files.append({
+                'name': file_record.filename,
+                'data': file_data,
+                'type': file_record.filetype,
+                'filepath': file_record.filepath  # Include filepath for PDF processing
+            })
+            
+    structured_data = generate_structured_summary(answers, files, user.id, transaction_details, claim.additional_info)
+    claim.structured_data = json.dumps(structured_data)
+    db.session.commit()
+    emit('update_claim_summary', {'claim_summary': structured_data})
 
 def validate_response_with_gpt4(claim_id, question_text, user_response):
     # Fetch previous messages
