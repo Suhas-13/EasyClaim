@@ -209,14 +209,10 @@ def view_claim(claim_id):
     # Determine if chat is locked
     chat_locked = claim.chat_locked
 
-    session['current_claim_id'] = claim.id
-
     return render_template('view_claim.html', claim=claim, chat_locked=chat_locked)
 
 @app.route('/get_messages/<int:claim_id>', methods=['GET'])
 def get_messages(claim_id):
-    user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     print(claim_id)
     print(claim.messages)
@@ -245,7 +241,6 @@ def get_all_messages():
 @socketio.on('connect')
 def handle_connect():
     session_id = request.sid
-    user_uuid = session.get('user_uuid')
     # Get the current claim ID from the session
     # claim_id = session.get('current_claim_id')
     print('----')
@@ -258,16 +253,13 @@ def handle_connect():
         return
 
     # Get transaction details from the client (if needed)
-    transaction_details = session.get('transaction_details')
-    if not transaction_details:
-        # For testing, use default transaction details
-        transaction_details = {
-            'transaction_name': 'Purchase at ABC Store',
-            'date': '2023-10-15',
-            'merchant_name': 'ABC Store',
-            'merchant_email': 'merchant@example.com',
-            'transaction_id': 'TX1234567890'
-        }
+    transaction_details = {
+        'transaction_name': 'Purchase at ABC Store',
+        'date': '2023-10-15',
+        'merchant_name': 'ABC Store',
+        'merchant_email': 'merchant@example.com',
+        'transaction_id': 'TX1234567890'
+    }
 
     # If the claim is already completed, do not ask questions
 
@@ -279,6 +271,7 @@ def handle_connect():
  
     # If there is a current question, resume from there
     print(claim)
+    print("Trying to initiate convo")
     if claim.current_question:
         ask_next_question(claim)
     else:
@@ -501,7 +494,7 @@ def handle_user_response(data):
         claim.additional_info = user_response
         db.session.add(message)
         db.session.commit()
-        create_claim()
+        create_claim(claim_id)
         return
 
     # Save message to database
@@ -522,12 +515,13 @@ def handle_user_response(data):
     if claim.question_index is None:
         emit('message', {'text': 'Please wait for the claim to be processed.'})
     # Validate the response with GPT-4
-    if claim.question_index > len(required_fields) - 1:
+    if claim.question_index > len(required_fields) - 1 or claim.question_index is None:
         if current_question == 'evidence_available' and 'done' in user_response.lower():
-            create_claim()
+            create_claim(claim_id)
             return
         else:
             emit('message', {'text': 'Please upload any evidence files that support your claim. If there is no relevant evidence or when you are done uploading, type "Done".'})
+            return
     
     field = required_fields[claim.question_index]
     validation_result = validate_response_with_gpt4(claim.id, field['question'], user_response)
@@ -671,11 +665,9 @@ def handle_file_chunk(data):
         emit('message', {'text': f'File "{filename}" uploaded successfully.'}, room=session_id)
         emit('message', {'text': 'Please upload any additional files or type "Done" when you are finished.'}, room=session_id)
         
-def create_claim():
+def create_claim(claim_id):
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
-    claim_id = session.get('current_claim_id')
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
@@ -744,17 +736,11 @@ def run_expert_reviews(claim_id, user_uuid):
         follow_up_needed = True
         follow_up_messages.append(chargeback_feedback['additional_info_needed'])
 
-    session_id = None
-    for sess_id, socket_session in socketio.server.environ.items():
-        socket_user_uuid = socket_session.get('user_uuid', session.get('user_uuid'))
-        if socket_user_uuid == user_uuid:
-            session_id = sess_id
-            break
 
-    if follow_up_needed and session_id:
+    if follow_up_needed:
         # Send follow-up messages to the user
         for msg in follow_up_messages:
-            emit('message', {'text': "ADDITIONAL INFORMATION REQUIRED: Additional information is required to process your claim: " + msg}, room=session_id)
+            emit('message', {'text': "ADDITIONAL INFORMATION REQUIRED: Additional information is required to process your claim: " + msg}, broadcast=True)
             # Save assistant message to chat history
             message = Message(claim_id=claim.id, sender='assistant', content= "ADDITIONAL INFORMATION REQUIRED: Additional information is required to process your claim: " + msg)
             db.session.add(message)
@@ -764,10 +750,10 @@ def run_expert_reviews(claim_id, user_uuid):
         claim.status = 'Follow-Up Needed'
         claim.state = ClaimState.ADDITIONAL_INFO.value
         db.session.commit()
-    if chargeback_feedback.get('action') == 'wait_for_shipping' and session_id:
+    if chargeback_feedback.get('action') == 'wait_for_shipping':
         # Inform the user to wait
         wait_message = 'Please wait for 10 days past the expected delivery date. If the item has not arrived by then, please let us know.'
-        emit('message', {'text': wait_message}, room=session_id)
+        emit('message', {'text': wait_message}, broadcast=True)
         # Save assistant message
         message = Message(claim_id=claim.id, sender='assistant', content=wait_message)
         db.session.add(message)

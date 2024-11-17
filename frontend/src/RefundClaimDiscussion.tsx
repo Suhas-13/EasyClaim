@@ -77,6 +77,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   useEffect(() => {
     const fetchMessages = async () => {
       try {
+        await client.disconnect();
         await client.connect(claimId.toString());
         if (messagesFetchedRef.current) return; // Prevent duplicate fetches
   
