@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 interface Transaction {
   id: number;
   date: string;
-  description: string;
+  transaction_description: string;
   merchant_email: string;
   transaction_id: string;
   amount: number;
@@ -48,11 +48,11 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
   ];
 
   const transactions: Transaction[] = [
-    { id: 1, date: '2024-10-13', description: 'Payment to Apple', amount: -600.00, status: 'Completed', category: 'Shopping', merchant_email: 'contact@apple.com', transaction_id: 'TX1234567890'},
-    { id: 2, date: '2024-10-14', description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income', transaction_id: 'TX0987654321', merchant_email: 'N/A'},
-    { id: 3, date: '2024-10-10', description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment', transaction_id: 'TX5678901234', merchant_email: 'contact@netflix.com'},
-    { id: 4, date: '2024-10-09', description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills', merchant_email: 'landlord@landlord.com', transaction_id: 'TX2345678901'},
-    { id: 5, date: '2024-10-08', description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping', merchant_email: 'temp@google.com', transaction_id: 'TX3456789012'}
+    { id: 1, date: '2024-10-13', transaction_description: 'Payment to Apple', amount: -600.00, status: 'Completed', category: 'Shopping', merchant_email: 'contact@apple.com', transaction_id: 'TX1234567890'},
+    { id: 2, date: '2024-10-14', transaction_description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income', transaction_id: 'TX0987654321', merchant_email: 'N/A'},
+    { id: 3, date: '2024-10-10', transaction_description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment', transaction_id: 'TX5678901234', merchant_email: 'contact@netflix.com'},
+    { id: 4, date: '2024-10-09', transaction_description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills', merchant_email: 'landlord@landlord.com', transaction_id: 'TX2345678901'},
+    { id: 5, date: '2024-10-08', transaction_description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping', merchant_email: 'temp@google.com', transaction_id: 'TX3456789012'}
   ];
 
   const handleDisputeTransaction = async () => {
@@ -150,7 +150,7 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
                     {transaction.amount > 0 ? '+' : '-'}
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">{transaction.description}</p>
+                    <p className="font-medium text-gray-900">{transaction.transaction_description}</p>
                     <p className="text-sm text-gray-500">{transaction.date}</p>
                   </div>
                 </div>
@@ -185,7 +185,7 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Description:</span>
-                    <span className="font-medium">{selectedTransaction.description}</span>
+                    <span className="font-medium">{selectedTransaction.transaction_description}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Amount:</span>

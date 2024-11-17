@@ -50,16 +50,6 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
           setUploadProgress(progress * 100); // Update progress in percentage
         });
         console.log("File uploaded successfully");
-        // Optionally, add a message indicating the file upload success
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            content: `File "${file.name}" uploaded successfully.`,
-            author: "You",
-            type: "User",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
       } catch (error) {
         console.error("File upload failed:", error);
         // Optionally, add a message indicating the file upload failure
