@@ -34,6 +34,8 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 }) => {
   const [messageInput, setMessageInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [structuredData, setStructuredData] = useState<any>({});
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesFetchedRef = useRef(false);
 
@@ -100,6 +102,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     };
   
     fetchMessages();
+    client.addStructuredDataWatcher((data)=>console.log(data));
   }, [claimId, client]);
   
 
@@ -189,7 +192,13 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
       <Navbar />
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
         <div className="w-1/3 border-r border-slate-800">
-          <ClaimSummary claim={claimDetails} />
+          <ClaimSummary data={
+            { 
+              'claim_summary': {
+                'transaction_details': structuredData,
+                'tracking_info': {},
+              }
+            }} />
         </div>
 
         <div className="w-2/3 flex flex-col relative">
