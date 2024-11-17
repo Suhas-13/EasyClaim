@@ -123,13 +123,10 @@ function uploadFileInChunks(file) {
             'totalChunks': totalChunks,
             'data': chunkData
         });
-        appendMessage(`Uploading chunk ${currentChunk + 1} of ${totalChunks} for file: ${file.name}`);
-
         currentChunk++;
         if (currentChunk < totalChunks) {
             readNextChunk();
         } else {
-            appendMessage(`Upload complete for file: ${file.name}`);
         }
     };
 
