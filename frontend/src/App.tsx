@@ -24,8 +24,6 @@ const App = () => {
 
     const initializeClient = async () => {
       try {
-        let result = await chargebackClient.startNewClaim();
-        await chargebackClient.connect(result.toString());
         setConnected(true);
         console.log(chargebackClient);
         console.log("Client initialized and connected.");
