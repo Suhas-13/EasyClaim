@@ -74,15 +74,16 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     }
   };
 
-  // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
-      if (messagesFetchedRef.current) return; // Prevent duplicate fetches
-      
       try {
+        await client.connect(claimId.toString());
+        if (messagesFetchedRef.current) return; // Prevent duplicate fetches
+  
         const fetchedMessages = await client.getMessages(claimId.toString());
         messagesFetchedRef.current = true;
         
+        // Process and set the messages
         //@ts-ignore
         const processedMessages = fetchedMessages.messages.map((message: any) => ({
           content: message.content,
@@ -90,15 +91,16 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
           type: getType(message.sender),
           timestamp: message.timestamp,
         }));
-        
+  
         setMessages(processedMessages);
       } catch (error) {
         console.error("Failed to fetch messages:", error);
       }
     };
-
+  
     fetchMessages();
   }, [claimId, client]);
+  
 
   // Set up message listener
   useEffect(() => {

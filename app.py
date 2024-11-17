@@ -311,9 +311,12 @@ You are disputing the following transaction:
         db.session.commit()
 
     # Initialize answers
+
+    print(claim.answers is None)
     if not claim.answers:
         claim.answers = json.dumps({})
         db.session.commit()
+        print("comitting")
 
     # Start asking questions
     if claim.question_index is None:
