@@ -54,7 +54,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
         {/* Claim Summary */}
         <div className="w-1/3 border-r border-slate-800">
-          <ClaimSummary />
+          <ClaimSummary claim={claimDetails}/>
         </div>
 
         {/* Discussion Area */}

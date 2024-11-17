@@ -2,6 +2,7 @@ import { Status } from "./components/Graph";
 
 // Define the structure of the event
 export interface Event {
+  id: number;
   timestamp: string;
   description: string;
 }
