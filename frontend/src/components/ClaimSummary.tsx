@@ -1,24 +1,19 @@
 import React, { useState } from "react";
+import { Claim, Event } from "../types";
 
-interface ClaimEvent {
-  timestamp: string;
-  description: string;
-  id: number;
-  isNew?: boolean; // Add isNew property, which is optional for old events
+type EventWithIsNew = Event & {
+  isNew?: boolean; // Optional property to track new events
 }
 
-const ClaimSummary: React.FC = () => {
-  const initialEvents: ClaimEvent[] = [
-    { timestamp: "2024-03-15 09:00", description: "Claim Filed", id: 1 },
-    {
-      timestamp: "2024-03-16 14:30",
-      description: "Initial Review Complete",
-      id: 2,
-    },
-  ];
+const ClaimSummary: React.FC<{ claim: Claim }> = ({ claim }) => {
+  // Explicitly typing the event and index parameters
+  const initialEvents: EventWithIsNew[] = claim.events.map((event: Event, index: number) => ({
+    ...event,
+    isNew: false
+  }));
 
-  const [events, setEvents] = useState<ClaimEvent[]>(initialEvents);
-  const [latestEventId, setLatestEventId] = useState(2);
+  const [events, setEvents] = useState<EventWithIsNew[]>(initialEvents);
+  const [latestEventId, setLatestEventId] = useState(events.length);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const addNewEvent = () => {
@@ -28,7 +23,7 @@ const ClaimSummary: React.FC = () => {
     const newEventId = latestEventId + 1;
     setLatestEventId(newEventId);
 
-    const newEvent: ClaimEvent = {
+    const newEvent: EventWithIsNew = {
       timestamp: new Date().toLocaleString(),
       description: `New Event #${events.length + 1}`,
       id: newEventId,
@@ -51,21 +46,18 @@ const ClaimSummary: React.FC = () => {
   return (
     <div className="bg-slate-900 shadow-xl h-full max-w-2xl mx-auto">
       <div className="p-6 border-b border-slate-800">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={addNewEvent}
-            disabled={isAnimating}
-            className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-md"
-          >
-            Add Event
-          </button>
-        </div>
+        <h2 className="text-xl font-semibold text-slate-200 mb-4">{claim.name}</h2>
+        <p className="text-sm text-slate-400 mb-2">{claim.description}</p>
+        <span className="block text-sm text-slate-400 mb-2">
+          Submission Date: {new Date(claim.submissionDate).toLocaleDateString()}
+        </span>
+        <span className="block text-sm text-slate-400 mb-6">
+          Status: <span className="text-indigo-500">{claim.status}</span>
+        </span>
       </div>
 
       <div className="p-6">
-        <h3 className="text-lg font-medium text-slate-300 mb-6">
-          Event Timeline
-        </h3>
+        <h3 className="text-lg font-medium text-slate-300 mb-6">Event Timeline</h3>
         <div className="relative space-y-4">
           {events.map((event, index) => (
             <div key={event.id} className="relative pl-4">
@@ -110,9 +102,7 @@ const ClaimSummary: React.FC = () => {
                 <span className="block text-sm font-medium text-slate-400 mb-1">
                   {event.timestamp}
                 </span>
-                <span className="block text-slate-200">
-                  {event.description}
-                </span>
+                <span className="block text-slate-200">{event.description}</span>
               </div>
             </div>
           ))}
