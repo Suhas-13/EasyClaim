@@ -15,6 +15,8 @@ class ChargebackClient {
   private socket: Socket | null = null;
   private messageHandlers: Set<MessageHandler> = new Set();
   private connected: boolean = false;
+  private structuredData: any = {}; // To store structuredData
+  private structuredDataWatchers: Set<(data: any) => void> = new Set(); // Watchers for structuredData
 
   constructor(baseUrl: string = 'http://localhost:5000') {
     this.baseUrl = baseUrl;
@@ -24,7 +26,6 @@ class ChargebackClient {
   async connect(claimId: string): Promise<void> {
     console.log(claimId);
     if (this.socket) return;
-
 
     this.socket = io(this.baseUrl, {
       query: {
@@ -45,6 +46,11 @@ class ChargebackClient {
       console.log('Disconnected from server');
     });
 
+    // Listen for the 'update_claim_summary' event
+    this.socket.on('update_claim_summary', (data: any) => {
+      this.setStructuredData(data); // Update structuredData with the new claim summary
+    });
+
     this.socket.on('message', (data: any) => {
       this.messageHandlers.forEach((handler) => handler(data));
     });
@@ -54,12 +60,33 @@ class ChargebackClient {
     });
   }
 
-
-  async fetchViewPage(claimId: string){
-    const response = await fetch(`${this.baseUrl}/view/${claimId}`, {
-      credentials: 'include', // Include cookies with the request
-    });
+  // Allow adding watchers for structuredData changes
+  addStructuredDataWatcher(watcher: (data: any) => void): void {
+    this.structuredDataWatchers.add(watcher);
   }
+
+  // Method to notify all watchers about the structuredData change
+  private notifyStructuredDataWatchers(): void {
+    this.structuredDataWatchers.forEach((watcher) => watcher(this.structuredData));
+  }
+
+  // Set structuredData and notify watchers
+  private setStructuredData(data: any): void {
+    this.structuredData = data;
+    this.notifyStructuredDataWatchers();
+  }
+
+  // Example method to fetch structuredData (it will notify watchers if it changes)
+  async fetchStructuredData(claimId: string): Promise<void> {
+    // Simulate fetching structured data from the server or an API call
+    const response = await fetch(`${this.baseUrl}/structured_data/${claimId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch structured data');
+    }
+    const data = await response.json();
+    this.setStructuredData(data); // Set and notify watchers
+  }
+
   // Login/initialize user session
   async login(uuid: string | null = null): Promise<string> {
     const response = await fetch(`${this.baseUrl}/login/${uuid || 'new'}`, {
@@ -197,10 +224,6 @@ class ChargebackClient {
       this.connected = false;
       this.messageHandlers.clear();
     }
-  }
-
-  addMessageHandler(messageHandler:any){
-    this.messageHandlers.add(messageHandler);
   }
 }
 
