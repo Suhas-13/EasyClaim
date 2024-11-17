@@ -4,6 +4,8 @@ os.environ['EVENTLET_HUB'] = 'poll'
 import eventlet
 eventlet.monkey_patch()
 
+import uuid 
+
 from openai import OpenAI
 
 from flask import jsonify
@@ -224,8 +226,8 @@ def get_messages(claim_id):
     messages = Message.query.filter_by(claim_id=claim_id).order_by(Message.timestamp).all()
     messages_list = [{'sender': msg.sender, 'content': msg.content, 'timestamp': msg.timestamp.isoformat()} for msg in messages]
     # check if message was created in the last 5 seconds, if so, exclude
-    if messages_list and datetime.fromisoformat(messages_list[-1]['timestamp']) > datetime.now() - timedelta(seconds=5):
-        messages_list = []
+    #if messages_list and datetime.fromisoformat(messages_list[-1]['timestamp']) > datetime.now() - timedelta(seconds=5):
+        #messages_list = []
     return jsonify({'messages': messages_list, 'claim_summary': claim.claim_summary})
 
 @socketio.on('get_all_messages')
@@ -235,9 +237,8 @@ def get_all_messages():
         return
     
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     for message in claim.messages:
         emit('message', {'text': message.content})
 
@@ -612,13 +613,13 @@ def validate_response_with_gpt4(claim_id, question_text, user_response):
 @socketio.on('upload_file_chunk')
 def handle_file_chunk(data):
     session_id = request.sid
-    user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
-    if not claim:
-        emit('message', {'text': 'Claim not found.'}, room=session_id)
-        return
+    data = data.get('data')
+    
+    if not claim_id:
+        claim_id = data.get('claimId')
+        
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
 
     filename = data.get('filename')
     chunk_index = data.get('chunk')
@@ -696,7 +697,7 @@ def create_claim():
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
     # Generate structured summary using LLM
-    structured_data = generate_structured_summary(answers, files, user.id, transaction_details, claim.additional_info)
+    structured_data = generate_structured_summary(answers, files, transaction_details, claim.additional_info)
     claim.structured_data = json.dumps(structured_data)
     claim.status = 'Pending'
     claim.state = ClaimState.COMPLETED.value
