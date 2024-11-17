@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import RefundClaimDiscussion from "./RefundClaimDiscussion";
 import "./App.css";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useParams } from "react-router-dom";
 import { CreditCompanyPage } from "./pages/creditCompany";
 import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
@@ -16,11 +16,10 @@ const App = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<ChargebackClient | null>(null);
-  const [claimId, setClaimId] = useState<number | null>(null);
 
   // Initialize the client
   useEffect(() => {
-    const chargebackClient = new ChargebackClient('http://localhost:5001');
+    const chargebackClient = new ChargebackClient("http://localhost:5001");
     setClient(chargebackClient);
 
     const initializeClient = async () => {
@@ -28,10 +27,9 @@ const App = () => {
         let result = await chargebackClient.startNewClaim();
         await chargebackClient.connect(result.toString());
         setConnected(true);
-        setClaimId(result);
-        console.log('Client initialized and connected.');
+        console.log("Client initialized and connected.");
       } catch (error) {
-        console.error('Failed to connect the client:', error);
+        console.error("Failed to connect the client:", error);
       }
     };
 
@@ -39,9 +37,9 @@ const App = () => {
 
     return () => {
       chargebackClient.disconnect();
-      console.log('Client disconnected.');
+      console.log("Client disconnected.");
     };
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   // Initialize claim details with proper type
   useEffect(() => {
@@ -54,30 +52,30 @@ const App = () => {
         {
           id: 1,
           timestamp: "2024-11-01T10:00:00Z",
-          description: "Claim filed by user."
+          description: "Claim filed by user.",
         },
         {
           id: 2,
           timestamp: "2024-11-01T11:30:00Z",
-          description: "Refund initiation started by Credit Card Co."
+          description: "Refund initiation started by Credit Card Co.",
         },
         {
           id: 3,
           timestamp: "2024-11-01T14:15:00Z",
-          description: "Seller approval received for refund."
+          description: "Seller approval received for refund.",
         },
         {
           id: 4,
           timestamp: "2024-11-02T09:00:00Z",
-          description: "Adjudicator review completed. Pending refund approval."
-        }
+          description: "Adjudicator review completed. Pending refund approval.",
+        },
       ],
       status: Status.ClaimSubmitted, // Assuming Status is an enum from Graph component
-      submissionDate: new Date("2024-11-01T10:00:00Z")
+      submissionDate: new Date("2024-11-01T10:00:00Z"),
     };
-    
+
     setClaimDetails(demoClaimDetails);
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   return (
     <div className="App">
@@ -87,17 +85,7 @@ const App = () => {
           <Route path="/policyView" element={<PolicyView />} />
           <Route
             path="/refundClaimDiscussion/:id"
-            element={
-              claimDetails && client && claimId ? (
-                <RefundClaimDiscussion
-                  claimDetails={claimDetails}
-                  client={client}
-                  claimId={claimId}
-                />
-              ) : (
-                <div>Loading...</div>
-              )
-            }
+            element={<RefundClaimDiscussionWrapper claimDetails={claimDetails} client={client} />}
           />
           <Route path="/claim/:id" element={<Claim />} />
           <Route
@@ -112,3 +100,14 @@ const App = () => {
 };
 
 export default App;
+
+// Component to handle dynamic claimId from URL
+const RefundClaimDiscussionWrapper = ({ claimDetails, client }: { claimDetails: ClaimType | null; client: ChargebackClient | null }) => {
+  const { id: claimId } = useParams();
+
+  if (!claimDetails || !client || !claimId) {
+    return <div>Loading...</div>;
+  }
+
+  return <RefundClaimDiscussion claimDetails={claimDetails} client={client} claimId={Number(claimId)} />;
+};
