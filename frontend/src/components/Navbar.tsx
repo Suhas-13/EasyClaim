@@ -7,7 +7,7 @@ const Navbar: React.FC = () => {
       <div className="max-w-6xl mx-auto p-4 flex justify-between items-center">
         {/* Logo or Brand Name */}
         <div className="text-2xl font-semibold bg-gradient-to-r from-indigo-400 to-cyan-400 text-transparent bg-clip-text">
-          QuickCheck
+          QuickClaim
         </div>
 
         {/* Navbar Links */}
