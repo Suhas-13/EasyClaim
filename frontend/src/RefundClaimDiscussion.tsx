@@ -21,11 +21,9 @@ const getType = (sender: string): string => {
   if (sender === "user") {
     return "user";
   }
-
   if (sender === "assistant") {
     return "adjudicator";
   }
-
   return "user";
 };
 
@@ -36,26 +34,26 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 }) => {
   const [messageInput, setMessageInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-
-  console.log(claimId);
-  // Ref for the messages container
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesFetchedRef = useRef(false);
 
-  // Fetch messages when the component mounts
+  // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
+      if (messagesFetchedRef.current) return; // Prevent duplicate fetches
+      
       try {
-        const fetchedMessages = await client.getMessages(claimId.toString())
-        const processedMessages = fetchedMessages
-          // @ts-ignore
-          .messages.map((message: any) => {
-            return {
-              content: message.content,
-              author: message.sender,
-              type: getType(message.sender),
-              timestamp: message.timestamp,
-            };
-          });
+        const fetchedMessages = await client.getMessages(claimId.toString());
+        messagesFetchedRef.current = true;
+        
+        //@ts-ignore
+        const processedMessages = fetchedMessages.messages.map((message: any) => ({
+          content: message.content,
+          author: message.sender,
+          type: getType(message.sender),
+          timestamp: message.timestamp,
+        }));
+        
         setMessages(processedMessages);
       } catch (error) {
         console.error("Failed to fetch messages:", error);
@@ -63,46 +61,65 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     };
 
     fetchMessages();
+  }, [claimId, client]);
 
+  // Set up message listener
+  useEffect(() => {
     const unsubscribe = client.onMessage((newMessage) => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          sender: "adjudicator",
+      setMessages((prevMessages) => {
+        // Check if message already exists to prevent duplicates
+        const messageExists = prevMessages.some(
+          (msg) => 
+            msg.content === newMessage.text && 
+            msg.timestamp === new Date().toISOString()
+        );
+        
+        if (messageExists) return prevMessages;
+        
+        return [...prevMessages, {
+          content: newMessage.text || "",
           author: "adjudicator",
           type: "adjudicator",
-          timestamp: "",
-          content: newMessage.text || "",
-        },
-      ]);
+          timestamp: new Date().toISOString(),
+        }];
+      });
     });
 
     return () => unsubscribe();
-  }, [claimId, client, messages, setMessages, client.onMessage]);
+  }, [client]);
 
-  // Auto-scroll to the bottom when messages change
+  // Auto-scroll effect
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, messagesEndRef]);
+  }, [messages]);
 
   const handleSendMessage = async () => {
     if (messageInput.trim()) {
+      const newMessage = {
+        author: "You",
+        type: "user" as const,
+        timestamp: new Date().toISOString(),
+        content: messageInput,
+      };
+
       try {
+        setMessageInput(""); // Clear input first
+        
+        // Update messages optimistically
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
+        
         await client.sendUserResponse(messageInput, claimId);
-        setMessageInput("");
-        setMessages([
-          ...messages,
-          {
-            author: "You",
-            type: "user",
-            timestamp: "",
-            content: messageInput,
-          },
-        ]);
       } catch (error) {
         console.error("Failed to send message:", error);
+        // Remove the message if sending failed
+        setMessages((prevMessages) => 
+          prevMessages.filter((msg) => 
+            msg.content !== newMessage.content || 
+            msg.timestamp !== newMessage.timestamp
+          )
+        );
       }
     }
   };
@@ -131,14 +148,11 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
     <div>
       <Navbar />
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
-        {/* Claim Summary */}
         <div className="w-1/3 border-r border-slate-800">
           <ClaimSummary claim={claimDetails} />
         </div>
 
-        {/* Discussion Area */}
         <div className="w-2/3 flex flex-col relative">
-          {/* Messages */}
           <div className="flex-1 p-6 space-y-6 overflow-y-auto pb-24">
             {messages.map((msg: Message, index: number) => (
               <div key={index} className="group">
@@ -151,11 +165,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={`text-sm font-medium ${getAuthorColor(
-                          msg.type
-                        )}`}
-                      >
+                      <span className={`text-sm font-medium ${getAuthorColor(msg.type)}`}>
                         {msg.author}
                       </span>
                       <span className="text-xs text-slate-500">
@@ -169,11 +179,9 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
                 </div>
               </div>
             ))}
-            {/* Auto-scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="absolute bottom-0 left-0 right-0 p-6 bg-slate-900/50 backdrop-blur-sm border-t border-slate-800">
             <div className="flex gap-4">
               <input
