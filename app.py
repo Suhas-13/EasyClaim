@@ -37,7 +37,7 @@ app.config['UPLOAD_FOLDER'] = 'uploaded_files'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db = SQLAlchemy(app)
-socketio = SocketIO(app, manage_session=False, max_http_buffer_size=100000000)
+socketio = SocketIO(app, manage_session=False, max_http_buffer_size=100000000, cors_allowed_origins='*')
 
 suhas_mode = True
 
