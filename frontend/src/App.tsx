@@ -14,6 +14,7 @@ const App = () => {
   const [messages, setMessages] = useState<any[]>([]); // Set initial state for messages
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<ChargebackClient | null>(null);
+  const [claimId, setClaimId] = useState<number | null>(null);
 
   useEffect(() => {
     const chargebackClient = new ChargebackClient('http://localhost:5000');
@@ -25,6 +26,7 @@ const App = () => {
         console.log(chargebackClient)
         setConnected(true);
         console.log('Client initialized and connected.');
+        setClaimId(await chargebackClient.startNewClaim());
       } catch (error) {
         console.error('Failed to connect the client:', error);
       }
@@ -62,37 +64,7 @@ const App = () => {
         },
       ],
     });
-
-    // Set demo messages
-    setMessages([
-      {
-        content: "The refund has been initiated. Please wait 3-5 business days.",
-        type: "credit-card",
-        author: "Credit Card Co.",
-        timestamp: "10:12 AM",
-      },
-      {
-        content: "Why is it taking so long?",
-        type: "user",
-        author: "You",
-        timestamp: "10:15 AM",
-      },
-      {
-        content:
-          "The seller needs to approve the refund before we can proceed.",
-        type: "adjudicator",
-        author: "Adjudicator",
-        timestamp: "10:18 AM",
-      },
-      {
-        content: "The refund is approved. Please expedite.",
-        type: "seller",
-        author: "Seller",
-        timestamp: "10:20 AM",
-      },
-    ]);
-  }, []);
-
+  });
   return (
     <div className="App">
       <Router>
@@ -103,10 +75,11 @@ const App = () => {
           <Route
             path="/refundClaimDiscussion/:id"
             element={
-              claimDetails && (
+              (claimDetails && client && claimId) && (
                 <RefundClaimDiscussion
                   claimDetails={claimDetails}
-                  messages={messages}
+                  client={client}
+                  claimId={claimId}
                 />
               )
             }
