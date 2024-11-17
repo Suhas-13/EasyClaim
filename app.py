@@ -27,7 +27,6 @@ from datetime import datetime
 import mimetypes
 import uuid
 from enum import Enum
-from mailersend import emails
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with your actual secret key
@@ -36,7 +35,7 @@ app.config['UPLOAD_FOLDER'] = 'uploaded_files'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db = SQLAlchemy(app)
-socketio = SocketIO(app, manage_session=False)
+socketio = SocketIO(app, manage_session=False, max_http_buffer_size=100000000)
 
 
 
@@ -47,7 +46,6 @@ class ClaimState(Enum):
     UPLOADING_EVIDENCE = 'UPLOADING_EVIDENCE'
     FINALIZING = 'FINALIZING'
     COMPLETED = 'COMPLETED'
-mailer = emails.NewEmail(os.environ.get('MAILERSEND_API_KEY'))
 
 # Database Models
 class User(db.Model):
@@ -220,6 +218,19 @@ def get_messages(claim_id):
     messages_list = [{'sender': msg.sender, 'content': msg.content, 'timestamp': msg.timestamp.isoformat()} for msg in messages]
     return jsonify({'messages': messages_list, 'claim_summary': claim.claim_summary})
 
+@socketio.on('get_all_messages')
+def get_all_messages():
+    claim_id = session.get('current_claim_id')
+    if not claim_id:
+        return
+    
+    user_uuid = session.get('user_uuid')
+    user = User.query.filter_by(user_uuid=user_uuid).first()
+    
+    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
+    for message in claim.messages:
+        emit('message', {'text': message.content})
+
 @socketio.on('connect')
 def handle_connect():
     session_id = request.sid
@@ -253,10 +264,7 @@ def handle_connect():
         }
 
     # If the claim is already completed, do not ask questions
-    
-    # go through and send all the messages
-    for message in claim.messages:
-        emit('message', {'text': message.content})
+
         
     if claim.state == ClaimState.COMPLETED.value:
         emit("message", {"text": "This claim has already been submitted and is awaiting further action."})
@@ -480,19 +488,7 @@ def handle_user_response(data):
     message = Message(claim_id=claim.id, sender='user', content=user_response)
     db.session.add(message)
     db.session.commit()
-
-    if current_question == 'evidence_available':
-        if user_response.strip().lower() == 'done':
-            # Proceed to create claim
-            create_claim()
-        else:
-            emit('message', {'text': 'Please upload your evidence files. When you are done uploading, type "Done".'})
-            # Save assistant message
-            assistant_message = Message(claim_id=claim.id, sender='assistant', content='Please upload your evidence files. When you are done uploading, type "Done".')
-            db.session.add(assistant_message)
-            db.session.commit()
-        return
-
+    
     # Load existing answers
     answers = json.loads(claim.answers)
 
@@ -503,6 +499,10 @@ def handle_user_response(data):
 
     
     # Validate the response with GPT-4
+    if claim.question_index > len(required_fields) - 1:
+        create_claim()
+        return
+    
     field = required_fields[claim.question_index]
     validation_result = validate_response_with_gpt4(claim.id, field['question'], user_response)
 
@@ -567,43 +567,64 @@ def validate_response_with_gpt4(claim_id, question_text, user_response):
         # Default to valid response to avoid blocking the flow
         return {'valid': True, 'clarification': ''}
 
-@socketio.on('upload_file')
-def handle_file_upload(data):
+@socketio.on('upload_file_chunk')
+def handle_file_chunk(data):
     session_id = request.sid
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).first()
     claim_id = session.get('current_claim_id')
     claim = Claim.query.filter_by(id=claim_id, user_id=user.id).first()
     if not claim:
+        emit('message', {'text': 'Claim not found.'}, room=session_id)
         return
 
-    # Check if the chat is locked
-    if claim.chat_locked:
-        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
+    filename = data.get('filename')
+    chunk_index = data.get('chunk')
+    total_chunks = data.get('totalChunks')
+    chunk_data = data.get('data')
+
+    # Decode chunk data
+    try:
+        header, encoded = chunk_data.split(',', 1)
+        file_bytes = base64.b64decode(encoded)
+    except Exception as e:
+        emit('message', {'text': f'Failed to process chunk {chunk_index + 1} of {total_chunks}: {str(e)}'}, room=session_id)
         return
 
-    file_data = data.get('file')
-    file_name = data.get('filename')
-    # Decode the data URL
-    header, encoded = file_data.split(',', 1)
-    file_bytes = base64.b64decode(encoded)
-    # Save the file to the server
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
-    with open(file_path, 'wb') as f:
-        f.write(file_bytes)
+    # Save the chunk to a temporary file
+    temp_dir = os.path.join(app.config['UPLOAD_FOLDER'], f"{filename}_chunks")
+    os.makedirs(temp_dir, exist_ok=True)
+    chunk_path = os.path.join(temp_dir, f"chunk_{chunk_index}")
+    with open(chunk_path, 'wb') as chunk_file:
+        chunk_file.write(file_bytes)
 
-    # Save file info to database
-    file_record = File(claim_id=claim.id, filename=file_name, filepath=file_path, filetype=mimetypes.guess_type(file_name)[0])
-    db.session.add(file_record)
-    db.session.commit()
+    # If all chunks are received, reassemble the file
+    if chunk_index + 1 == total_chunks:
+        final_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(final_file_path, 'wb') as final_file:
+            for i in range(total_chunks):
+                with open(os.path.join(temp_dir, f"chunk_{i}"), 'rb') as chunk_file:
+                    final_file.write(chunk_file.read())
+        # Clean up chunks
+        for chunk_file in os.listdir(temp_dir):
+            os.remove(os.path.join(temp_dir, chunk_file))
+        os.rmdir(temp_dir)
 
-    # Add file message to chat history
-    message = Message(claim_id=claim.id, sender='user', content=f'Uploaded file: {file_name}')
-    db.session.add(message)
-    db.session.commit()
+        # Save the file record to the database
+        file_record = File(
+            claim_id=claim.id,
+            filename=filename,
+            filepath=final_file_path,
+            filetype=mimetypes.guess_type(filename)[0]
+        )
+        db.session.add(file_record)
+        db.session.commit()
 
-    emit('message', {'text': 'File received. If you have more evidence, please upload them. When you are done, type "Done".'})
-
+        # Notify client of successful upload
+        emit('message', {'text': f'File "{filename}" uploaded successfully.'}, room=session_id)
+    else:
+        emit('message', {'text': f'Chunk {chunk_index + 1}/{total_chunks} of file "{filename}" uploaded successfully.'}, room=session_id)
+        
 def create_claim():
     session_id = request.sid
     user_uuid = session.get('user_uuid')
@@ -628,7 +649,6 @@ def create_claim():
                 'type': file_record.filetype,
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
-
     # Generate structured summary using LLM
     structured_data = generate_structured_summary(answers, files, user.id, transaction_details)
     claim.structured_data = json.dumps(structured_data)
@@ -739,6 +759,22 @@ def send_claim_to_merchant(claim_id):
     claim.status = 'Awaiting Merchant Response'
     db.session.commit()
 
+def send_email(to_email, subject, body):
+    # Simplified email sending function
+    from_email = 'noreply@yourdomain.com'
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+
+    # Send the email (replace with your SMTP server details)
+    try:
+        smtp = smtplib.SMTP('localhost')  # or your SMTP server
+        smtp.sendmail(from_email, [to_email], msg.as_string())
+        smtp.quit()
+        print(f"Email sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 @app.route('/merchant_view/<int:claim_id>')
 def merchant_view(claim_id):
@@ -823,37 +859,9 @@ def perform_final_adjudication(claim_id):
         db.session.add(message_record)
         db.session.commit()
 
-def send_email(merchant_email: str,subject:str, body:str):
-    # define an empty dict to populate with mail values
-    mail_body = {}
-
-    mail_from = {
-        "name": "EasyClaim",
-        "email": "easyclaim94@trial-jpzkmgqr0jy4059v.mlsender.net",
-    }
-
-    recipients = [
-        {
-            "name": "easycla",
-            "email": merchant_email,
-        }
-    ]
-
-    # reply_to = {
-    #     "name": "Name",
-    #     "email": "reply@domain.com",
-    # }
-
-    mailer.set_mail_from(mail_from, mail_body)
-    mailer.set_mail_to(recipients, mail_body)
-    mailer.set_subject(subject, mail_body)
-    mailer.set_html_content(body, mail_body)
-    mailer.set_plaintext_content(body, mail_body)
-
-    print(mailer.send(mail_body))
-
 @socketio.on('disconnect')
 def handle_disconnect():
+    print("DISCONNECTING")
     pass
 
 @app.route('/uploaded_files/<filename>')

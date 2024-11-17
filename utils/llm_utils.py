@@ -45,7 +45,7 @@ Provide the JSON output only, with the following structure:
     "item_name": "",
     "have_contacted_seller": "",
     "tracking_information": "",  # Include tracking numbers or shipping links if provided
-    "evidence_summary": "",  # Summarized description of PDFs, images, or other files attached.
+    "attachment_summary": "",  # Summarized description of each PDFs, images, or other files attached. Please be accurate more than anything else and do not hallucinate.
     "additional_notes": ""}}
 
 User Responses:
@@ -58,6 +58,7 @@ User Responses:
     for file in files:
         file_type = file.get('type', '')
         file_name = file['name']
+        print(file_name, file_type)
         if file_type.startswith('image/'):
             # Include the image in the messages
             image_base64 = base64.b64encode(file['data']).decode('utf-8')
