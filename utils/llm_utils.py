@@ -26,31 +26,27 @@ def generate_structured_summary(answers, files, user_id, transaction_details):
             "content": f"""
 Please create a structured summary of the following claim details provided by the cardholder during an interactive session.
 
-Ensure that all sensitive personal information is anonymized or omitted.
+Please summarise or rephrase the following information in a structured format so that it is easier to process and analyze:
 
-Include any relevant information from the attached evidence.
+Include all relevant information from the attached evidence.
 
 Provide the JSON output only, with the following structure:
 - "transaction_details": {{
     "transaction_name": "{transaction_details.get('transaction_name', '')}",
     "date_of_transaction": "{transaction_details.get('date', '')}",
-    "amount": "",  # If available
+    "amount": "{transaction_details.get('amount', '')}",  # If available
     "merchant_name": "{transaction_details.get('merchant_name', '')}",
     "merchant_email": "{transaction_details.get('merchant_email', '')}",
     "transaction_id": "{transaction_details.get('transaction_id', '')}"
-}},
-- "claimant_information": {{
-    "user_id": "{user_id}"
-}},
-- "issue_description": "",
-- "dispute_category": "",  # E.g., "Item not received", "Item damaged", "Unauthorized transaction", "Other"
-- "item_or_service": "",
-- "item_name": "",
-- "have_contacted_seller": "",
-- "tracking_information": "",  # Include tracking numbers or shipping links if provided
-- "evidence_summary": "",  # Summarized description of the evidence provided
-- "desired_resolution": "",
-- "additional_notes": ""
+    "user_id": "{user_id}",
+    "issue_description": "",
+    "dispute_category": "",  # E.g., "Item not received", "Item damaged", "Unauthorized transaction", "Other"
+    "item_or_service": "", # E.g., "Physical goods", "Digital goods", "Services"
+    "item_name": "",
+    "have_contacted_seller": "",
+    "tracking_information": "",  # Include tracking numbers or shipping links if provided
+    "evidence_summary": "",  # Summarized description of PDFs, images, or other files attached.
+    "additional_notes": ""}}
 
 User Responses:
 {json.dumps(answers, indent=2)}
@@ -124,9 +120,9 @@ Claim Data:
 
 Based on the dispute category "{structured_data.get('dispute_category', '')}", evaluate the claim according to the following policies:
 
-- **Item not received**: The customer must wait at least 15 days after the expected delivery date before filing a claim. Tracking information should indicate non-delivery.
+- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. Tracking information should indicate non-delivery.
 - **Item damaged**: The customer should provide a description of the damage and evidence such as photos.
-- **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date.
+- **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date and must provide a detailed explanation of when they realized the transaction was unauthorized and why.
 
 Determine if the claim complies with the policies. If not, specify what additional information is needed.
 
@@ -137,13 +133,13 @@ Provide your response in JSON format:
     "action": ""  # "proceed_with_claim", "request_additional_info", "reject_claim"
 }}
 """
-
-    response = client.completions.create(engine="gpt-4",
-    prompt=prompt,
+    messages = [{'role': 'system', 'content': prompt}]
+    response = client.chat.completions.create(model="gpt-4o",
+    messages=messages,
     max_tokens=300,
     temperature=0.5)
     try:
-        feedback = json.loads(response.choices[0].text.strip())
+        feedback = json.loads(response.choices[0].message.content.strip())
     except json.JSONDecodeError:
         feedback = {}
     return feedback
@@ -171,13 +167,13 @@ Provide your response in JSON format:
     "rationale": ""
 }}
 """
-
-    response = client.completions.create(engine="gpt-4o",
-    prompt=prompt,
+    messages = [{'role': 'system', 'content': prompt}]
+    response = client.chat.completions.create(model="gpt-4o",
+    messages=messages,
     max_tokens=300,
     temperature=0.5)
     try:
-        adjudication_data = json.loads(response.choices[0].text.strip())
+        adjudication_data = json.loads(response.choices[0].message.content.strip())
     except json.JSONDecodeError:
         adjudication_data = {}
     return adjudication_data
@@ -202,13 +198,13 @@ Provide your response in JSON format:
     "action": ""  # "proceed_with_claim", "request_additional_info"
 }}
 """
-
-    response = client.completions.create(engine="gpt-4",
-    prompt=prompt,
+    messages = [{'role': 'system', 'content': prompt}]
+    response = client.chat.completions.create(model="gpt-4o",
+    messages=messages,
     max_tokens=300,
     temperature=0.5)
     try:
-        feedback = json.loads(response.choices[0].text.strip())
+        feedback = json.loads(response.choices[0].message.content.strip())
     except json.JSONDecodeError:
         feedback = {}
     return feedback

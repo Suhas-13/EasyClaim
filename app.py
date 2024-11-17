@@ -152,6 +152,7 @@ def index():
     transaction_details = {
         'transaction_name': 'Purchase at ABC Store',
         'date': '2023-10-15',
+        'amount': '$100.00',
         'merchant_name': 'ABC Store',
         'merchant_email': 'merchant@example.com',
         'transaction_id': 'TX1234567890'
@@ -177,6 +178,7 @@ def start_new_claim():
     session['transaction_details'] = {
         'transaction_name': 'Purchase at ABC Store',
         'date': '2023-10-15',
+        'amount': '$100.00',
         'merchant_name': 'ABC Store',
         'merchant_email': 'merchant@example.com',
         'transaction_id': 'TX1234567890'
@@ -228,6 +230,7 @@ def handle_connect():
 
     # Get the current claim ID from the session
     claim_id = session.get('current_claim_id')
+    
     if not claim_id:
         # No claim in session; do nothing
         return
@@ -236,11 +239,6 @@ def handle_connect():
         if not claim:
             # Claim not found; do nothing
             return
-
-    # Check if the chat is locked
-    if claim.chat_locked:
-        emit('message', {'text': 'Chat is locked. Please wait for a response from the merchant or credit card company.'})
-        return
 
     # Get transaction details from the client (if needed)
     transaction_details = session.get('transaction_details')
@@ -255,13 +253,16 @@ def handle_connect():
         }
 
     # If the claim is already completed, do not ask questions
-    if claim.state == ClaimState.COMPLETED.value:
-        return
-
+    
     # go through and send all the messages
     for message in claim.messages:
         emit('message', {'text': message.content})
         
+    if claim.state == ClaimState.COMPLETED.value:
+        emit("message", {"text": "This claim has already been submitted and is awaiting further action."})
+        return
+
+ 
     # If there is a current question, resume from there
     if claim.current_question:
         ask_next_question(claim)
@@ -651,17 +652,15 @@ def create_claim():
     db.session.commit()
 
     # Run expert reviews in a separate thread to avoid blocking
-    run_expert_reviews(claim.id)
+    run_expert_reviews(claim.id, user_uuid)
 
-def run_expert_reviews(claim_id):
+def run_expert_reviews(claim_id, user_uuid):
     with app.app_context():
         claim = Claim.query.get(claim_id)
     if not claim:
         return
 
     structured_data = json.loads(claim.structured_data)
-    with app.app_context():
-        user_uuid = claim.user.user_uuid
 
     # Shipping expert review
     shipping_feedback = shipping_expert_review(structured_data)
@@ -703,12 +702,12 @@ def run_expert_reviews(claim_id):
             db.session.add(message)
             db.session.commit()
         # Set the claim status back to 'In Progress'
-        claim.status = 'In Progress'
-        claim.chat_locked = False
+        claim.status = 'Follow-Up Needed'
+        claim.state = ClaimState.COLLECTING_INFO.value
         db.session.commit()
     elif shipping_feedback.get('action') == 'wait' and session_id:
         # Inform the user to wait
-        wait_message = 'Our experts suggest waiting before proceeding with the dispute.'
+        wait_message = 'Please wait for 10 days past the expected delivery date. If the item has not arrived by then, please let us know.'
         emit('message', {'text': wait_message}, room=session_id)
         # Save assistant message
         message = Message(claim_id=claim.id, sender='assistant', content=wait_message)
@@ -727,6 +726,7 @@ def send_claim_to_merchant(claim_id):
         return
 
     structured_data = json.loads(claim.structured_data)
+    print(structured_data)
     merchant_email = structured_data['transaction_details']['merchant_email']
     merchant_link = f'http://localhost:5000/merchant_view/{claim_id}'
 
