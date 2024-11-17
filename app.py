@@ -7,7 +7,7 @@ eventlet.monkey_patch()
 from openai import OpenAI
 
 from flask import jsonify
-
+from datetime import datetime, timedelta
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 from flask import Flask, render_template, request, session, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -60,6 +60,7 @@ class Claim(db.Model):
     structured_data = db.Column(db.Text)
     status = db.Column(db.String(50))
     state = db.Column(db.String(50), default=ClaimState.START.value)
+    additional_info = db.Column(db.Text)
     adjudication_result = db.Column(db.Text)
     expert_feedback = db.Column(db.Text)
     merchant_response = db.Column(db.Text)
@@ -216,6 +217,9 @@ def get_messages(claim_id):
 
     messages = Message.query.filter_by(claim_id=claim_id).order_by(Message.timestamp).all()
     messages_list = [{'sender': msg.sender, 'content': msg.content, 'timestamp': msg.timestamp.isoformat()} for msg in messages]
+    # check if message was created in the last 5 seconds, if so, exclude
+    if messages_list and messages_list[-1]['timestamp'] > datetime.now() - timedelta(seconds=5):
+        messages_list = []
     return jsonify({'messages': messages_list, 'claim_summary': claim.claim_summary})
 
 @socketio.on('get_all_messages')
@@ -477,18 +481,25 @@ def handle_user_response(data):
         emit('message', {'text': 'This claim has already been submitted and is awaiting further action.'})
         return
     
-    if claim.state == ClaimState.ADDITIONAL_INFO.value:
-        emit('message', {'text': 'Thank you for providing additional information. We will review the information and get back to you.'})
-        create_claim()
-        return
-
     current_question = claim.current_question
     user_response = data.get('text')
+
+    
+    if claim.state == ClaimState.ADDITIONAL_INFO.value:
+        emit('message', {'text': 'Thank you for providing additional information. We will review the information and get back to you.'})
+        # Save message to database
+        message = Message(claim_id=claim.id, sender='user', content=user_response)
+        claim.additional_info = user_response
+        db.session.add(message)
+        db.session.commit()
+        create_claim()
+        return
 
     # Save message to database
     message = Message(claim_id=claim.id, sender='user', content=user_response)
     db.session.add(message)
     db.session.commit()
+    
     
     # Load existing answers
     answers = json.loads(claim.answers)
@@ -660,7 +671,7 @@ def create_claim():
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
     # Generate structured summary using LLM
-    structured_data = generate_structured_summary(answers, files, user.id, transaction_details)
+    structured_data = generate_structured_summary(answers, files, user.id, transaction_details, claim.additional_info)
     claim.structured_data = json.dumps(structured_data)
     claim.status = 'Pending'
     claim.state = ClaimState.COMPLETED.value
@@ -728,7 +739,7 @@ def run_expert_reviews(claim_id, user_uuid):
         claim.status = 'Follow-Up Needed'
         claim.state = ClaimState.ADDITIONAL_INFO.value
         db.session.commit()
-    elif chargeback_feedback.get('action') == 'wait' and session_id:
+    if chargeback_feedback.get('action') == 'wait_for_shipping' and session_id:
         # Inform the user to wait
         wait_message = 'Please wait for 10 days past the expected delivery date. If the item has not arrived by then, please let us know.'
         emit('message', {'text': wait_message}, room=session_id)

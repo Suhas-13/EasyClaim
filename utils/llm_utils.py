@@ -18,7 +18,8 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 # Set up OpenAI API key
   # Ensure your API key is set in environment variables
 
-def generate_structured_summary(answers, files, user_id, transaction_details):
+def generate_structured_summary(answers, files, user_id, transaction_details, additional_info=""):
+    print(answers)
     messages = [
         {
             "role": "system",
@@ -54,6 +55,9 @@ Provide the JSON output only, with the following structure:
 
 User Responses:
 {json.dumps(answers, indent=2)}
+
+Additional Information:
+{additional_info}
 """
         }
     ]
@@ -126,7 +130,7 @@ Claim Data:
 
 Based on the dispute category "{structured_data.get('dispute_category', '')}", evaluate the claim according to the following policies:
 
-- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". The customer must provide proof of having attempted to contact the seller.
+- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". However, this is only if there is evidence of the delivery date. If the delivery date is unknown this must be provided first through a request_for_information. The customer must provide proof of having attempted to contact the seller.
 - **Item damaged**: The customer should provide a description of the damage and evidence such as photos. The customer must provide proof of having attempted to contact the seller.
 - **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date and must provide a detailed explanation of when they realized the transaction was unauthorized and why.
 
@@ -134,9 +138,8 @@ Determine if the claim complies with the policies. If not, specify what addition
 
 Provide your response in JSON format:
 {{
-    "policy_compliance": "",  # "Compliant" or "Non-compliant"
-    "additional_info_needed": "",  # Any additional info needed from the user. If no additional info is needed, leave this field empty.
     "action": ""  # "proceed_with_claim", "request_additional_info", "wait_for_shipping"
+    "additional_info_needed": "",  # Any additional info needed from the user. If no additional info is needed or if additional info has been provided already, leave this field empty.
 }}
 """
     messages = [{'role': 'system', 'content': prompt}]
@@ -214,10 +217,10 @@ def call_shipping_api(provider, tracking_number):
                 "estimated_arrival": "2024-11-18"
             },
             "444555666": {
-                "current_date": "2024-11-17",
-                "shipped": False,
+                "current_date": "2024-10-17",
+                "shipped": True,
                 "delivered": False,
-                "estimated_arrival": None
+                "estimated_arrival": "2024-10-21"
             }
         }
     }
