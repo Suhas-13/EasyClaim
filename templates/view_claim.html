@@ -44,7 +44,7 @@
     <a href="{{ url_for('index') }}">Back to Claims List</a>
 
     <script>
-        var socket = io();
+        var socket = io({maxHttpBufferSize: 1e8, pingTimeout: 60000});
         var chatWindow = document.getElementById('chat-window');
         var messageInput = document.getElementById('message-input');
         var sendButton = document.getElementById('send-button');
@@ -81,6 +81,7 @@
         
         socket.on('connect', function() {
             console.log('Connected to server');
+            socket.emit('get_all_messages');
         });
 
         socket.on('message', function(data) {
@@ -100,24 +101,52 @@
         });
 
         fileInput.addEventListener('change', function() {
-            var files = fileInput.files;
-            for (var i = 0; i < files.length; i++) {
-                (function(file) {
-                    var reader = new FileReader();
-                    reader.onload = function(evt) {
-                        var fileData = evt.target.result;
-                        socket.emit('upload_file', {
-                            'filename': file.name,
-                            'file': fileData
-                        });
-                        appendMessage('You uploaded: ' + file.name);
-                    };
-                    reader.readAsDataURL(file);
-                })(files[i]);
-            }
-            fileInput.value = '';
-        });
+    var files = fileInput.files;
+    for (var i = 0; i < files.length; i++) {
+        uploadFileInChunks(files[i]);
+    }
+    fileInput.value = ''; // Clear the file input
+});
 
+function uploadFileInChunks(file) {
+    const chunkSize = 1024 * 1024; // 1MB per chunk
+    const totalChunks = Math.ceil(file.size / chunkSize);
+    let currentChunk = 0;
+
+    const reader = new FileReader();
+
+    reader.onload = function(evt) {
+        var chunkData = evt.target.result;
+        socket.emit('upload_file_chunk', {
+            'filename': file.name,
+            'chunk': currentChunk,
+            'totalChunks': totalChunks,
+            'data': chunkData
+        });
+        appendMessage(`Uploading chunk ${currentChunk + 1} of ${totalChunks} for file: ${file.name}`);
+
+        currentChunk++;
+        if (currentChunk < totalChunks) {
+            readNextChunk();
+        } else {
+            appendMessage(`Upload complete for file: ${file.name}`);
+        }
+    };
+
+    reader.onerror = function(err) {
+        appendMessage(`Error reading file ${file.name}: ${err}`);
+    };
+
+    function readNextChunk() {
+        const start = currentChunk * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const blob = file.slice(start, end);
+        reader.readAsDataURL(blob);
+    }
+
+    // Start reading the first chunk
+    readNextChunk();
+}
         function appendMessage(message) {
             var p = document.createElement('p');
             p.innerHTML = message;
