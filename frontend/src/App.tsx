@@ -7,10 +7,38 @@ import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
 import BankingApp from "./components/BankingApp";
 import Home from "./pages/home";
+import ChargebackClient from "./FrontendIntegration"
 
 const App = () => {
   const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
   const [messages, setMessages] = useState<any[]>([]); // Set initial state for messages
+  const [connected, setConnected] = useState(false);
+  const [client, setClient] = useState<ChargebackClient | null>(null);
+
+  useEffect(() => {
+    const chargebackClient = new ChargebackClient('http://localhost:5000');
+    setClient(chargebackClient);
+
+    const initializeClient = async () => {
+      try {
+        await chargebackClient.connect();
+        console.log(chargebackClient)
+        setConnected(true);
+        console.log('Client initialized and connected.');
+      } catch (error) {
+        console.error('Failed to connect the client:', error);
+      }
+    };
+
+    initializeClient();
+
+    // Cleanup function to disconnect the client when the component unmounts
+    return () => {
+      chargebackClient.disconnect();
+      console.log('Client disconnected.');
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount
+
 
   useEffect(() => {
     // Set demo claim details
