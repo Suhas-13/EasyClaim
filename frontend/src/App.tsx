@@ -20,7 +20,7 @@ const App = () => {
 
   // Initialize the client
   useEffect(() => {
-    const chargebackClient = new ChargebackClient('http://localhost:5000');
+    const chargebackClient = new ChargebackClient('http://localhost:5001');
     setClient(chargebackClient);
 
     const initializeClient = async () => {
