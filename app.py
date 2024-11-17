@@ -705,22 +705,6 @@ def send_claim_to_merchant(claim_id):
     claim.status = 'Awaiting Merchant Response'
     db.session.commit()
 
-def send_email(to_email, subject, body):
-    # Simplified email sending function
-    from_email = 'noreply@yourdomain.com'
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = from_email
-    msg['To'] = to_email
-
-    # Send the email (replace with your SMTP server details)
-    try:
-        smtp = smtplib.SMTP('localhost')  # or your SMTP server
-        smtp.sendmail(from_email, [to_email], msg.as_string())
-        smtp.quit()
-        print(f"Email sent to {to_email}")
-    except Exception as e:
-        print(f"Failed to send email: {e}")
 
 @app.route('/merchant_view/<int:claim_id>')
 def merchant_view(claim_id):
@@ -805,19 +789,19 @@ def perform_final_adjudication(claim_id):
         db.session.add(message_record)
         db.session.commit()
 
-def send_email():
+def send_email(merchant_email: str,subject:str, body:str):
     # define an empty dict to populate with mail values
     mail_body = {}
 
     mail_from = {
         "name": "EasyClaim",
-        "email": "easyclaim94@gmail.com",
+        "email": "easyclaim94@trial-jpzkmgqr0jy4059v.mlsender.net",
     }
 
     recipients = [
         {
-            "name": "shashah",
-            "email": "shashah.dahdah@gmail.com",
+            "name": "easycla",
+            "email": merchant_email,
         }
     ]
 
@@ -828,14 +812,11 @@ def send_email():
 
     mailer.set_mail_from(mail_from, mail_body)
     mailer.set_mail_to(recipients, mail_body)
-    mailer.set_subject("Hello!", mail_body)
-    mailer.set_html_content("This is the HTML content", mail_body)
-    mailer.set_plaintext_content("This is the text content", mail_body)
-    # mailer.set_reply_to(reply_to, mail_body)
-    print('sending mail body: ', mail_body)
-    # using print() will also return status code and data
-    mailer.send(mail_body)
-    print('mail sent')
+    mailer.set_subject(subject, mail_body)
+    mailer.set_html_content(body, mail_body)
+    mailer.set_plaintext_content(body, mail_body)
+
+    print(mailer.send(mail_body))
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -847,4 +828,3 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     socketio.run(app, debug=False)
-    send_email()
