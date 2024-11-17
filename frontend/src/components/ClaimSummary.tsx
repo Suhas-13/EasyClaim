@@ -21,7 +21,7 @@ interface TransactionDetails {
 }
 
 interface TrackingInfo {
-  data: string | null | undefined;
+  data?: string | null | undefined;
   error?: string | null | undefined;
 }
 
