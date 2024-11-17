@@ -1,5 +1,8 @@
 import os
 import base64
+
+import requests
+
 import json
 from openai import OpenAI
 
@@ -45,8 +48,9 @@ Provide the JSON output only, with the following structure:
     "item_name": "",
     "have_contacted_seller": "",
     "tracking_information": "",  # Include tracking numbers or shipping links if provided
-    "attachment_summary": "",  # Summarized description of each PDFs, images, or other files attached. Please be accurate more than anything else and do not hallucinate.
-    "additional_notes": ""}}
+    "attachment_summary": "",  # Summarized description of each PDFs, images, or other files attached. Please be accurate more than anything else and do not hallucinate. Structure it in the format of "File Name: Description"
+    "additional_notes": "",
+    "additional_info_requests: "", # Any additional information requested of the customer}}
 
 User Responses:
 {json.dumps(answers, indent=2)}
@@ -104,8 +108,11 @@ User Responses:
     response_format={ "type": "json_object" })
 
     structured_summary = response.choices[0].message.content.strip()
+    print(structured_summary)
     try:
         structured_data = json.loads(structured_summary)
+        shipping_info = shipping_expert_review(structured_data)
+        structured_data["tracking_info"] = shipping_info
     except json.JSONDecodeError:
         structured_data = {}
     return structured_data
@@ -119,8 +126,8 @@ Claim Data:
 
 Based on the dispute category "{structured_data.get('dispute_category', '')}", evaluate the claim according to the following policies:
 
-- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. Tracking information should indicate non-delivery.
-- **Item damaged**: The customer should provide a description of the damage and evidence such as photos.
+- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". The customer must provide proof of having attempted to contact the seller.
+- **Item damaged**: The customer should provide a description of the damage and evidence such as photos. The customer must provide proof of having attempted to contact the seller.
 - **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date and must provide a detailed explanation of when they realized the transaction was unauthorized and why.
 
 Determine if the claim complies with the policies. If not, specify what additional information is needed.
@@ -128,14 +135,15 @@ Determine if the claim complies with the policies. If not, specify what addition
 Provide your response in JSON format:
 {{
     "policy_compliance": "",  # "Compliant" or "Non-compliant"
-    "additional_info_needed": "",  # Any additional info needed from the user
-    "action": ""  # "proceed_with_claim", "request_additional_info", "reject_claim"
+    "additional_info_needed": "",  # Any additional info needed from the user. If no additional info is needed, leave this field empty.
+    "action": ""  # "proceed_with_claim", "request_additional_info", "wait_for_shipping"
 }}
 """
     messages = [{'role': 'system', 'content': prompt}]
     response = client.chat.completions.create(model="gpt-4o",
     messages=messages,
     max_tokens=300,
+    response_format={ "type": "json_object" },
     temperature=0.5)
     try:
         feedback = json.loads(response.choices[0].message.content.strip())
@@ -176,34 +184,108 @@ Provide your response in JSON format:
     except json.JSONDecodeError:
         adjudication_data = {}
     return adjudication_data
+
+
+def call_shipping_api(provider, tracking_number):
+    """
+    Simulates a shipping API call by returning data from a predefined dictionary.
+    """
+    # Mock database of tracking information for demonstration purposes
+    MOCK_TRACKING_DATA = {
+        "UPS": {
+            "123456789": {
+                "current_date": "2024-11-17",
+                "shipped": True,
+                "delivered": False,
+                "estimated_arrival": "2024-11-20"
+            },
+            "987654321": {
+                "current_date": "2024-11-17",
+                "shipped": True,
+                "delivered": True,
+                "estimated_arrival": "2024-11-15"
+            }
+        },
+        "FedEx": {
+            "111222333": {
+                "current_date": "2024-11-17",
+                "shipped": True,
+                "delivered": False,
+                "estimated_arrival": "2024-11-18"
+            },
+            "444555666": {
+                "current_date": "2024-11-17",
+                "shipped": False,
+                "delivered": False,
+                "estimated_arrival": None
+            }
+        }
+    }
+
+    # Lookup tracking information
+    tracking_info = MOCK_TRACKING_DATA.get(provider, {}).get(tracking_number)
+    
+    if not tracking_info:
+        return {"error": f"No tracking information found for provider '{provider}' and tracking number '{tracking_number}'."}
+    
+    return tracking_info
+
+
 def shipping_expert_review(structured_data):
+    """
+    Extract tracking provider and tracking number from structured data,
+    call the mock shipping API, and return the tracking data directly.
+    """
+    # Step 1: Extract tracking details
     prompt = f"""
-You are a shipping expert reviewing a dispute claim.
+Extract the shipping provider and tracking number from the claim details below. If either is missing, specify "None".
 
 Claim Data:
 {json.dumps(structured_data, indent=2)}
 
-Based on the dispute category "{structured_data.get('dispute_category', '')}", please determine if all necessary information is provided.
-
-- For "Item not received", check if tracking information is available.
-- For "Item damaged", check if a description of the damage and evidence (e.g., photos) are provided.
-- For "Unauthorized transaction", check if the user has provided details about when they realized the transaction was unauthorized.
-
-If any required information is missing, specify what is needed.
-
 Provide your response in JSON format:
 {{
-    "additional_info_needed": "",  # Describe any additional info needed from the user
-    "action": ""  # "proceed_with_claim", "request_additional_info"
+    "tracking_provider": "",
+    "tracking_number": ""
 }}
 """
     messages = [{'role': 'system', 'content': prompt}]
-    response = client.chat.completions.create(model="gpt-4o",
-    messages=messages,
-    max_tokens=300,
-    temperature=0.5)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        max_tokens=200,
+        temperature=0.5
+    )
     try:
-        feedback = json.loads(response.choices[0].message.content.strip())
+        tracking_details = json.loads(response.choices[0].message.content.strip())
     except json.JSONDecodeError:
-        feedback = {}
-    return feedback
+        tracking_details = {"tracking_provider": None, "tracking_number": None}
+
+    provider = tracking_details.get("tracking_provider")
+    tracking_number = tracking_details.get("tracking_number")
+
+    # Step 2: Validate extracted details
+    if not provider or not tracking_number:
+        return {"error": "Tracking provider or tracking number is missing."}
+
+    # Step 3: Call the mock shipping API
+    tracking_info = call_shipping_api(provider, tracking_number)
+    if not tracking_info or "error" in tracking_info:
+        return {"error": "Unable to retrieve shipping information from the tracking API."}
+
+    shipped = "Yes" if tracking_info["shipped"] else "No"
+    delivered = "Yes" if tracking_info["delivered"] else "No"
+    estimated_arrival = tracking_info["estimated_arrival"] or "Unknown"
+    current_date = tracking_info["current_date"]
+
+    formatted_info = (
+        f"Shipping Details:\n"
+        f"- Provider: {provider}\n"
+        f"- Tracking Number: {tracking_number}\n"
+        f"- Shipped: {shipped}\n"
+        f"- Delivered: {delivered}\n"
+        f"- Estimated Arrival: {estimated_arrival}\n"
+        f"- Current Date: {current_date}"
+    )
+    
+    return formatted_info
