@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AlertCircle, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 
 interface TransactionDetails {
-  transaction_name: string | null | undefined;
   date_of_transaction: string | null | undefined;
   amount: string | null | undefined;
   merchant_name: string | null | undefined;
@@ -10,17 +9,19 @@ interface TransactionDetails {
   transaction_id: string | null | undefined;
   user_id: string | null | undefined;
   issue_description: string | null | undefined;
+  transaction_description: string | null | undefined;
   dispute_category: string | null | undefined;
   item_or_service: string | null | undefined;
   item_name: string | null | undefined;
   have_contacted_seller: string | null | undefined;
-  tracking_information: string | null | undefined;
+  tracking_info: string | null | undefined;
   attachment_summary: string | null | undefined;
   additional_notes: string | null | undefined;
   additional_info_requests: string | null | undefined;
 }
 
 interface TrackingInfo {
+  data: string | null | undefined;
   error?: string | null | undefined;
 }
 
@@ -133,18 +134,19 @@ const ClaimSummary: React.FC<Props> = ({ data }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DetailRow icon="💰" label="Amount" value={transaction_details.amount} />
-          <DetailRow icon="🏪" label="Merchant" value={transaction_details.merchant_name} />
+          <DetailRow icon="🏪" label="Merchant Email" value={transaction_details.merchant_email} />
         </div>
-
+        <DetailRow icon="🏪" label="Description" value={transaction_details.transaction_description} />
+        <DetailRow icon="🏪" label="Transaction Date" value={transaction_details.date_of_transaction} />
         <DetailRow icon="📝" label="Issue Description" value={transaction_details.issue_description} />
 
-        {isExpanded && (
+        { (
           <div className="space-y-4 animate-[fadeIn_0.2s_ease-in-out]">
-            <DetailRow icon="📦" label="Item/Service" value={transaction_details.item_or_service} />
+            <DetailRow icon="📦" label="Tracking Info" value={tracking_info.data} />
             <DetailRow icon="🏷️" label="Item Name" value={transaction_details.item_name} />
+            <DetailRow icon="📌" label="Dispute Category" value={transaction_details.dispute_category} />
             <DetailRow icon="💬" label="Contacted Seller" value={transaction_details.have_contacted_seller} />
             <DetailRow icon="📎" label="Attachments" value={transaction_details.attachment_summary} />
-            <DetailRow icon="📌" label="Additional Notes" value={transaction_details.additional_notes} />
           </div>
         )}
 

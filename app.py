@@ -174,10 +174,9 @@ def start_new_claim():
     session.pop('current_claim_id', None)
     transaction_id = request.args.get('transaction_id')
     transaction_description = request.args.get('transaction_description')
-    transaction_date = request.args.get('transaction_date')
-    description = request.args.get('description')
+    transaction_date = request.args.get('date')
     merchant_email = request.args.get('merchant_email')
-    amount = request.args.get('amount')
+    amount = abs(float(request.args.get('amount')))
     # Create a new claim and redirect to its chat window
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
@@ -274,11 +273,28 @@ def handle_connect():
 
     # If the claim is already completed, do not ask questions
 
-        
+
+    files = []
+    file_records = File.query.filter_by(claim_id=claim.id).all()
+    for file_record in file_records:
+        with open(file_record.filepath, 'rb') as f:
+            file_data = f.read()
+            files.append({
+                'name': file_record.filename,
+                'data': file_data,
+                'type': file_record.filetype,
+                'filepath': file_record.filepath  # Include filepath for PDF processing
+            })
+            
+    structured_data = generate_structured_summary(claim, claim.answers, files, transaction_details, claim.additional_info)
+    claim.structured_data = json.dumps(structured_data)
+    db.session.commit()
+    emit('update_claim_summary', {'claim_summary': structured_data})
+    
     if claim.state == ClaimState.COMPLETED.value:
         emit("message", {"text": "This claim has already been submitted and is awaiting further action."})
         return
-
+    
  
     # If there is a current question, resume from there
     print(claim)
@@ -699,7 +715,7 @@ def create_claim(claim_id):
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
     # Generate structured summary using LLM
-    structured_data = generate_structured_summary(answers, files, transaction_details, claim.additional_info)
+    structured_data = generate_structured_summary(claim, answers, files, transaction_details, claim.additional_info)
     claim.structured_data = json.dumps(structured_data)
     claim.status = 'Pending'
     claim.state = ClaimState.COMPLETED.value

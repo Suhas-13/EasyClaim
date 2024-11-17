@@ -35,7 +35,7 @@ Include all relevant information from the attached evidence.
 
 Provide the JSON output only, with the following structure:
 - "transaction_details": {{
-    "transaction_name": "{claim.transaction_description}",
+    "transaction_description": "{claim.transaction_description}",
     "date_of_transaction": "{claim.transaction_date}",
     "amount": "{claim.amount}",  # If available
     "merchant_email": "{claim.merchant_email}",
@@ -46,7 +46,7 @@ Provide the JSON output only, with the following structure:
     "item_or_service": "", # E.g., "Physical goods", "Digital goods", "Services"
     "item_name": "",
     "have_contacted_seller": "",
-    "tracking_information": "",  # Include tracking numbers or shipping links if provided
+    "tracking_number": "",  # Include tracking numbers or shipping links if provided
     "attachment_summary": "",  # Summarized description of each PDFs, images, or other files attached. Please be accurate more than anything else and do not hallucinate. Structure it in the format of "File Name: Description"
     "additional_notes": "",
     "additional_info_requests: "", # Any additional information requested of the customer}}
@@ -64,7 +64,6 @@ Additional Information:
     for file in files:
         file_type = file.get('type', '')
         file_name = file['name']
-        print(file_name, file_type)
         if file_type.startswith('image/'):
             # Include the image in the messages
             image_base64 = base64.b64encode(file['data']).decode('utf-8')
@@ -110,11 +109,11 @@ Additional Information:
     response_format={ "type": "json_object" })
 
     structured_summary = response.choices[0].message.content.strip()
-    print(structured_summary)
     try:
         structured_data = json.loads(structured_summary)
-        shipping_info = shipping_expert_review(structured_data)
-        structured_data["tracking_info"] = shipping_info
+        shipping_info = shipping_expert_review(messages, structured_data)
+        structured_data["tracking_info"] = {"data": shipping_info}
+        print(structured_data   )
     except json.JSONDecodeError:
         structured_data = {}
     return structured_data
@@ -128,7 +127,7 @@ Claim Data:
 
 Based on the dispute category "{structured_data.get('dispute_category', '')}", evaluate the claim according to the following policies:
 
-- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". However, this is only if there is evidence of the delivery date. If the delivery date is unknown this must be provided first through a request_for_information. If the expected delivery date is in additional_notes then it should not be asked for. The customer must provide proof of having attempted to contact the seller.
+- **Item not received**: The customer must wait at least 10 days after the expected delivery date before filing a claim. If they have not waited the required time, the action should be "wait_for_shipping". However, this is only if there is evidence of the delivery date. If the delivery date is unknown this must be provided first through a request_for_information. If the expected delivery date is in additional_notes then it should not be asked for. 
 - **Item damaged**: The customer should provide a description of the damage and evidence such as photos. The customer must provide proof of having attempted to contact the seller.
 - **Unauthorized transaction**: The customer must report the unauthorized transaction within 60 days of the transaction date and must provide a detailed explanation of when they realized the transaction was unauthorized and why.
 - **Order that is late but eventually arrived**: These orders are not eligible for a chargeback if the order eventually arrived.
@@ -194,39 +193,14 @@ def call_shipping_api(provider, tracking_number):
     Simulates a shipping API call by returning data from a predefined dictionary.
     """
     # Mock database of tracking information for demonstration purposes
-    MOCK_TRACKING_DATA = {
-        "UPS": {
-            "123456789": {
-                "current_date": "2024-11-17",
-                "shipped": True,
-                "delivered": False,
-                "estimated_arrival": "2024-11-20"
-            },
-            "987654321": {
-                "current_date": "2024-11-17",
-                "shipped": True,
-                "delivered": True,
-                "estimated_arrival": "2024-11-15"
-            }
-        },
-        "FedEx": {
-            "111222333": {
-                "current_date": "2024-11-17",
-                "shipped": True,
-                "delivered": False,
-                "estimated_arrival": "2024-11-18"
-            },
-            "444555666": {
-                "current_date": "2024-10-17",
-                "shipped": True,
-                "delivered": False,
-                "estimated_arrival": "2024-10-21"
-            }
-        }
-    }
 
     # Lookup tracking information
-    tracking_info = MOCK_TRACKING_DATA.get(provider, {}).get(tracking_number)
+    tracking_info =  {
+                "current_date": "2024-11-17",
+                "shipped": True,
+                "delivered": False,
+                "estimated_arrival": "2024-11-03"
+            }
     
     if not tracking_info:
         return {"error": f"No tracking information found for provider '{provider}' and tracking number '{tracking_number}'."}
@@ -234,19 +208,21 @@ def call_shipping_api(provider, tracking_number):
     return tracking_info
 
 
-def shipping_expert_review(structured_data):
+def shipping_expert_review(messages, structured_data):
     """
     Extract tracking provider and tracking number from structured data,
     call the mock shipping API, and return the tracking data directly.
     """
+    print("TRTYING SHIPIPING EXPERT REVIEW")
     # Step 1: Extract tracking details
     prompt = f"""
 Extract the shipping provider and tracking number from the claim details below. If either is missing, specify "None".
 
 Claim Data:
-{json.dumps(structured_data, indent=2)}
+{json.dumps(structured_data, indent=2)} 
 
 Provide your response in JSON format:
+Tracking provider can be one of the following: "UPS", "FedEx", "USPS", "DHL", "Other". If there is no tracking number then return an empty JSON object.
 {{
     "tracking_provider": "",
     "tracking_number": ""
@@ -257,18 +233,19 @@ Provide your response in JSON format:
         model="gpt-4o",
         messages=messages,
         max_tokens=200,
-        temperature=0.5
-    )
+        temperature=0.5,
+        response_format={ "type": "json_object" })
     try:
         tracking_details = json.loads(response.choices[0].message.content.strip())
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(e)
         tracking_details = {"tracking_provider": None, "tracking_number": None}
 
     provider = tracking_details.get("tracking_provider")
     tracking_number = tracking_details.get("tracking_number")
-
+    
     # Step 2: Validate extracted details
-    if not provider and not tracking_number:
+    if not provider or not tracking_number or provider.lower() not in ["ups", "fedex", "usps", "dhl", "other"]:
         return {"error": "Tracking provider and tracking number is missing."}
 
     if not provider:
@@ -288,7 +265,7 @@ Provide your response in JSON format:
     current_date = tracking_info["current_date"]
 
     formatted_info = (
-        f"Shipping Details:\n"
+        f"Shipping Info:\n"
         f"- Provider: {provider}\n"
         f"- Tracking Number: {tracking_number}\n"
         f"- Shipped: {shipped}\n"
@@ -296,5 +273,7 @@ Provide your response in JSON format:
         f"- Estimated Arrival: {estimated_arrival}\n"
         f"- Current Date: {current_date}"
     )
+    
+    print(formatted_info)
     
     return formatted_info
