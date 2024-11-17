@@ -18,7 +18,6 @@ from utils.llm_utils import (
     chargeback_policies_expert_review,
     final_adjudication
 )
-import smtplib
 from email.mime.text import MIMEText
 import threading
 import base64
@@ -760,21 +759,7 @@ def send_claim_to_merchant(claim_id):
     db.session.commit()
 
 def send_email(to_email, subject, body):
-    # Simplified email sending function
-    from_email = 'noreply@yourdomain.com'
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = from_email
-    msg['To'] = to_email
-
-    # Send the email (replace with your SMTP server details)
-    try:
-        smtp = smtplib.SMTP('localhost')  # or your SMTP server
-        smtp.sendmail(from_email, [to_email], msg.as_string())
-        smtp.quit()
-        print(f"Email sent to {to_email}")
-    except Exception as e:
-        print(f"Failed to send email: {e}")
+    pass
 
 @app.route('/merchant_view/<int:claim_id>')
 def merchant_view(claim_id):
