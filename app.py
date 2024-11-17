@@ -39,7 +39,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 db = SQLAlchemy(app)
 socketio = SocketIO(app, manage_session=False, max_http_buffer_size=100000000, cors_allowed_origins='*')
 
-suhas_mode = True
+suhas_mode = False
 
 # Define Claim States
 class ClaimState(Enum):
@@ -481,7 +481,7 @@ def handle_user_response(data):
     if not session.get('current_claim_id'):
         claim_id = data.get('claim_id')
 
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
 
