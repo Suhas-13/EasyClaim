@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Claim } from "./types";
 import Navbar from "./components/Navbar";
 import ClaimSummary from "./components/ClaimSummary";
+import ChargebackClient from "./FrontendIntegration";
 
 interface Message {
   content: string;
@@ -12,19 +13,51 @@ interface Message {
 
 interface RefundClaimDiscussionProps {
   claimDetails: Claim;
-  messages: Message[];
+  claimId: number;
+  client: ChargebackClient;
 }
 
 const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   claimDetails,
-  messages,
+  client,
+  claimId,
 }) => {
   const [messageInput, setMessageInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Fetch messages when the component mounts
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const fetchedMessages = await client.getMessages(claimId.toString());
+        // @ts-ignore
+        setMessages(fetchedMessages.messages); // @ts-nocheck
+      } catch (error) {
+        console.error("Failed to fetch messages:", error);
+      }
+    };
 
-  const handleSendMessage = () => {
+    fetchMessages();
+
+    // Optionally, you can subscribe to real-time messages here
+    const unsubscribe = client.onMessage((newMessage) => {
+      setMessages((prevMessages) => [...prevMessages, newMessage]);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, [claimId, client]);
+
+  // Handle sending a message
+  const handleSendMessage = async () => {
     if (messageInput.trim()) {
-      console.log("Message sent:", messageInput);
-      setMessageInput("");
+      try {
+        await client.sendUserResponse(messageInput, claimId);
+        console.log("Message sent:", messageInput);
+        setMessageInput("");  // Clear input after sending
+      } catch (error) {
+        console.error("Failed to send message:", error);
+      }
     }
   };
 
@@ -54,7 +87,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
         {/* Claim Summary */}
         <div className="w-1/3 border-r border-slate-800">
-          <ClaimSummary claim={claimDetails}/>
+          <ClaimSummary claim={claimDetails} />
         </div>
 
         {/* Discussion Area */}
@@ -65,9 +98,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
               <div key={index} className="group">
                 <div className="flex items-start gap-4">
                   <div
-                    className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-slate-100 font-medium ${getAvatarColor(
-                      msg.type
-                    )}`}
+                    className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-slate-100 font-medium ${getAvatarColor(msg.type)}`}
                   >
                     {msg.author[0].toUpperCase()}
                   </div>

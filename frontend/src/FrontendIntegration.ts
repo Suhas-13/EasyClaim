@@ -58,7 +58,7 @@ class ChargebackClient {
   }
 
   // Start a new claim
-  async startNewClaim(): Promise<string> {
+  async startNewClaim(): Promise<number> {
     const response = await fetch(`${this.baseUrl}/start_new_claim`, {
       method: 'GET',
       credentials: 'include', // Include cookies with the request
@@ -70,7 +70,7 @@ class ChargebackClient {
 
     const data = await response.json();
 
-    return data.claim_id || '';
+    return data.id || 0;
   }
 
   // Get messages for a claim
@@ -91,11 +91,11 @@ class ChargebackClient {
   }
 
   // Send user response
-  sendUserResponse(text: string): void {
+  sendUserResponse(text: string, claim_id: number): void {
     if (!this.connected) {
       throw new Error('Not connected to server');
     }
-    this.socket!.emit('user_response', { text });
+    this.socket!.emit('user_response', { text, claim_id: claim_id });
   }
 
   // Upload file in chunks
