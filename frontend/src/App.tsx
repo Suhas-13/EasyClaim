@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import RefundClaimDiscussion from "./RefundClaimDiscussion"; // Import RefundClaimDiscussion component
+import RefundClaimDiscussion from "./RefundClaimDiscussion";
 import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CreditCompanyPage } from "./pages/creditCompany";
@@ -7,15 +7,18 @@ import { Claim } from "./components/Claim";
 import PolicyView from "./PolicyView";
 import BankingApp from "./components/BankingApp";
 import Home from "./pages/home";
-import ChargebackClient from "./FrontendIntegration"
+import ChargebackClient from "./FrontendIntegration";
+import { Claim as ClaimType } from "./types"; // Assuming the interface is in types.ts
+import { Status } from "./components/Graph";
 
 const App = () => {
-  const [claimDetails, setClaimDetails] = useState<any>(null); // Update state to use claimDetails
-  const [messages, setMessages] = useState<any[]>([]); // Set initial state for messages
+  const [claimDetails, setClaimDetails] = useState<ClaimType | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<ChargebackClient | null>(null);
   const [claimId, setClaimId] = useState<number | null>(null);
 
+  // Initialize the client
   useEffect(() => {
     const chargebackClient = new ChargebackClient('http://localhost:5000');
     setClient(chargebackClient);
@@ -24,12 +27,9 @@ const App = () => {
       try {
         let result = await chargebackClient.startNewClaim();
         await chargebackClient.connect(result.toString());
-        console.log(chargebackClient)
         setConnected(true);
-        console.log('Client initialized and connected.');
         setClaimId(result);
-        console.log(document.cookie);
-        console.log(document.cookie);
+        console.log('Client initialized and connected.');
       } catch (error) {
         console.error('Failed to connect the client:', error);
       }
@@ -37,70 +37,74 @@ const App = () => {
 
     initializeClient();
 
-    // Cleanup function to disconnect the client when the component unmounts
     return () => {
       chargebackClient.disconnect();
       console.log('Client disconnected.');
     };
   }, []); // Empty dependency array ensures this runs only once on mount
 
-
+  // Initialize claim details with proper type
   useEffect(() => {
-    // Set demo claim details
-    setClaimDetails({
-      id: "123456",
-      date: "2024-11-01",
+    const demoClaimDetails: ClaimType = {
+      id: 123456,
+      name: "Product Shipment Delay Claim",
       description: "Refund claim due to delayed shipment of product XYZ.",
+      documentFiles: ["invoice.pdf", "shipping_label.pdf"],
       events: [
-        { timestamp: "2024-11-01", description: "Claim filed by user." },
         {
-          timestamp: "2024-11-01",
-          description: "Refund initiation started by Credit Card Co.",
+          id: 1,
+          timestamp: "2024-11-01T10:00:00Z",
+          description: "Claim filed by user."
         },
         {
-          timestamp: "2024-11-01",
-          description: "Seller approval received for refund.",
+          id: 2,
+          timestamp: "2024-11-01T11:30:00Z",
+          description: "Refund initiation started by Credit Card Co."
         },
         {
-          timestamp: "2024-11-02",
-          description: "Adjudicator review completed. Pending refund approval.",
+          id: 3,
+          timestamp: "2024-11-01T14:15:00Z",
+          description: "Seller approval received for refund."
         },
+        {
+          id: 4,
+          timestamp: "2024-11-02T09:00:00Z",
+          description: "Adjudicator review completed. Pending refund approval."
+        }
       ],
-    });
-  });
+      status: Status.ClaimSubmitted, // Assuming Status is an enum from Graph component
+      submissionDate: new Date("2024-11-01T10:00:00Z")
+    };
+    
+    setClaimDetails(demoClaimDetails);
+  }, []); // Empty dependency array ensures this runs only once
+
   return (
     <div className="App">
       <Router>
         <Routes>
           <Route path="/creditCompany" element={<CreditCompanyPage />} />
           <Route path="/policyView" element={<PolicyView />} />
-
           <Route
             path="/refundClaimDiscussion/:id"
             element={
-              (claimDetails && client && claimId) && (
+              claimDetails && client && claimId ? (
                 <RefundClaimDiscussion
                   claimDetails={claimDetails}
                   client={client}
                   claimId={claimId}
                 />
+              ) : (
+                <div>Loading...</div>
               )
             }
           />
           <Route path="/claim/:id" element={<Claim />} />
           <Route
             path="/bankingApp"
-            element={
-              claimDetails && <BankingApp
-              />
-            }
+            element={claimDetails ? <BankingApp /> : <div>Loading...</div>}
           />
-          <Route
-            path="/home"
-            element={
-              <Home></Home>
-            }>
-          </Route>
+          <Route path="/home" element={<Home />} />
         </Routes>
       </Router>
     </div>
