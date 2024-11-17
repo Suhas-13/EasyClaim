@@ -23,10 +23,14 @@ class ChargebackClient {
   async connect(claimId: string): Promise<void> {
     if (this.socket) return;
 
+
     this.socket = io(this.baseUrl, {
       query: {
         claimId: claimId
-      }
+      },
+      //@ts-ignore
+      maxHttpBufferSize: 1e8,
+      pingTimeout: 60000
     });
 
     this.socket.on('connect', () => {
