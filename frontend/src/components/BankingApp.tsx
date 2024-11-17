@@ -57,7 +57,7 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
     if (selectedTransaction) {
       try {
         const id = await client.startNewClaim();
-        navigate(`/refundClaimDiscussion/${id}`);
+        navigate(`/claim/${id}`);
       } catch (error) {
         console.error('Error initiating dispute:', error);
       }
