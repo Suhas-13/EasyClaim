@@ -200,7 +200,7 @@ def view_claim(claim_id):
         return redirect(url_for('load_user'))
 
     # Get the claim
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     
     if not claim:
         return 'Claim not found or you do not have access to it.', 404
@@ -216,7 +216,7 @@ def view_claim(claim_id):
 def get_messages(claim_id):
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     print(claim.messages)
     if not claim:
         return jsonify({'error': 'Unauthorized access or claim not found.'}), 403
