@@ -66,6 +66,11 @@ class Claim(db.Model):
     status = db.Column(db.String(50))
     state = db.Column(db.String(50), default=ClaimState.START.value)
     additional_info = db.Column(db.Text)
+    transaction_description = db.Column(db.Text)
+    transaction_id = db.Column(db.String(50))
+    amount = db.Column(db.String(50))
+    merchant_email = db.Column(db.String(100))
+    transaction_date = db.Column(db.String(50))
     adjudication_result = db.Column(db.Text)
     expert_feedback = db.Column(db.Text)
     merchant_response = db.Column(db.Text)
@@ -98,7 +103,7 @@ with app.app_context():
 
 # Define the required fields for the claim
 required_fields = [
-    {'id': 'issue_description', 'question': 'Please describe the issue you are experiencing.', 'field': 'issue_description', 'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other']},
+    {'id': 'issue_description', 'question': 'Please describe the issue you are experiencing. (i.e. Item not received, Item damaged, Unauthorized transaction, Other)', 'field': 'issue_description', 'options': ['Item not received', 'Item damaged', 'Unauthorized transaction', 'Other']},
     {'id': 'item_or_service', 'question': 'Is the dispute about an item or a service?', 'field': 'item_or_service', 'options': ['Item', 'Service']},
     {'id': 'item_name', 'question': 'Please provide the name of the item or service.', 'field': 'item_name'},
     {'id': 'have_contacted_seller', 'question': 'Have you contacted the merchant about this issue?', 'field': 'have_contacted_seller', 'options': ['Yes', 'No']},
@@ -167,6 +172,12 @@ def index():
 @app.route('/start_new_claim')
 def start_new_claim():
     session.pop('current_claim_id', None)
+    transaction_id = request.args.get('transaction_id')
+    transaction_description = request.args.get('transaction_description')
+    transaction_date = request.args.get('transaction_date')
+    description = request.args.get('description')
+    merchant_email = request.args.get('merchant_email')
+    amount = request.args.get('amount')
     # Create a new claim and redirect to its chat window
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
@@ -174,7 +185,7 @@ def start_new_claim():
         return redirect(url_for('load_user'))
 
     # Create a new claim
-    claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
+    claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value, transaction_id=transaction_id, amount=amount, merchant_email=merchant_email, transaction_date=transaction_date, transaction_description=transaction_description)
     db.session.add(claim)
     db.session.commit()
     
@@ -293,13 +304,13 @@ You are disputing the following transaction:
 - **Transaction ID**: {transaction_details['transaction_id']}
 
 """
-        emit('message', {'text': transaction_info})
+        #emit('message', {'text': transaction_info})
         emit('message', {'text': 'Let\'s proceed to gather more information about your dispute.'})
 
         # Save assistant messages
-        message1 = Message(claim_id=claim.id, sender='assistant', content=transaction_info)
-        message2 = Message(claim_id=claim.id, sender='assistant', content='Let\'s proceed to gather more information about your dispute.')
-        db.session.add(message1)
+        #message1 = Message(claim_id=claim.id, sender='assistant', content=transaction_info)
+        message2 = Message(claim_id=claim.id, sender='assistant', content="Hi Suhas! Let's try to understand your dispute a bit better.")
+        #db.session.add(message1)
         db.session.add(message2)
         db.session.commit()
 
@@ -558,7 +569,7 @@ def handle_user_response(data):
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
             
-    structured_data = generate_structured_summary(answers, files, transaction_details, claim.additional_info)
+    structured_data = generate_structured_summary(claim, answers, files, transaction_details, claim.additional_info)
     claim.structured_data = json.dumps(structured_data)
     db.session.commit()
     emit('update_claim_summary', {'claim_summary': structured_data})
@@ -710,6 +721,8 @@ def create_claim(claim_id):
     db.session.commit()
 
     # Run expert reviews in a separate thread to avoid blocking
+    if claim.additional_info:
+        return
     run_expert_reviews(claim.id, user_uuid)
 
 def run_expert_reviews(claim_id, user_uuid):

@@ -6,6 +6,8 @@ interface Transaction {
   id: number;
   date: string;
   description: string;
+  merchant_email: string;
+  transaction_id: string;
   amount: number;
   status: string;
   category: string;
@@ -46,17 +48,17 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
   ];
 
   const transactions: Transaction[] = [
-    { id: 1, date: '2024-10-13', description: 'Payment to Apple', amount: -600.00, status: 'Completed', category: 'Shopping' },
-    { id: 2, date: '2024-10-14', description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income' },
-    { id: 3, date: '2024-10-10', description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment' },
-    { id: 4, date: '2024-10-09', description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills' },
-    { id: 5, date: '2024-10-08', description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping' }
+    { id: 1, date: '2024-10-13', description: 'Payment to Apple', amount: -600.00, status: 'Completed', category: 'Shopping', merchant_email: 'contact@apple.com', transaction_id: 'TX1234567890'},
+    { id: 2, date: '2024-10-14', description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income', transaction_id: 'TX0987654321', merchant_email: 'N/A'},
+    { id: 3, date: '2024-10-10', description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment', transaction_id: 'TX5678901234', merchant_email: 'contact@netflix.com'},
+    { id: 4, date: '2024-10-09', description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills', merchant_email: 'landlord@landlord.com', transaction_id: 'TX2345678901'},
+    { id: 5, date: '2024-10-08', description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping', merchant_email: 'temp@google.com', transaction_id: 'TX3456789012'}
   ];
 
   const handleDisputeTransaction = async () => {
     if (selectedTransaction) {
       try {
-        const id = await client.startNewClaim();
+        const id = await client.startNewClaim(selectedTransaction);
         navigate(`/claim/${id}`);
       } catch (error) {
         console.error('Error initiating dispute:', error);

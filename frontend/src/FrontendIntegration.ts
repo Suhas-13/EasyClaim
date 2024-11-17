@@ -101,8 +101,17 @@ class ChargebackClient {
   }
 
   // Start a new claim
-  async startNewClaim(): Promise<number> {
-    const response = await fetch(`${this.baseUrl}/start_new_claim`, {
+  //@ts-ignore
+  async startNewClaim(transaction): Promise<number> {
+    const url = new URL(`${this.baseUrl}/start_new_claim`);
+
+    Object.keys(transaction).forEach(key => {
+      if (transaction[key] !== undefined && transaction[key] !== null) {
+          url.searchParams.append(key, transaction[key]);
+      }
+  });
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       credentials: 'include', // Include cookies with the request
     });
