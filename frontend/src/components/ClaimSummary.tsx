@@ -159,17 +159,6 @@ const ClaimSummary: React.FC<Props> = ({ data }) => {
         )}
 
         <div className="mt-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-medium text-slate-300">Timeline</h3>
-            <button
-              onClick={addNewEvent}
-              className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-pink-500 hover:bg-pink-600 text-white transition-colors duration-200"
-            >
-              <Plus size={16} />
-              <span>Add Event</span>
-            </button>
-          </div>
-
           <div className="relative space-y-6">
             {events.map((event, index) => (
               <div key={event.id} className="relative pl-6">
