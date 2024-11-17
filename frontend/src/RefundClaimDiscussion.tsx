@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Claim } from "./types";
 import Navbar from "./components/Navbar";
 import ClaimSummary from "./components/ClaimSummary";
@@ -17,6 +17,18 @@ interface RefundClaimDiscussionProps {
   client: ChargebackClient;
 }
 
+const getType = (sender: string): string => {
+  if (sender === "user") {
+    return "user";
+  }
+
+  if (sender === "assistant") {
+    return "adjudicator";
+  }
+
+  return "user";
+};
+
 const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   claimDetails,
   client,
@@ -24,15 +36,27 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 }) => {
   const [messageInput, setMessageInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  
+
+  console.log(claimId);
+  // Ref for the messages container
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
   // Fetch messages when the component mounts
   useEffect(() => {
-    console.log(claimId);
     const fetchMessages = async () => {
       try {
-        const fetchedMessages = await client.getMessages(claimId.toString());
-        // @ts-ignore
-        setMessages(fetchedMessages.messages); // @ts-nocheck
+        const fetchedMessages = await client.getMessages(claimId.toString())
+        const processedMessages = fetchedMessages
+          // @ts-ignore
+          .messages.map((message: any) => {
+            return {
+              content: message.content,
+              author: message.sender,
+              type: getType(message.sender),
+              timestamp: message.timestamp,
+            };
+          });
+        setMessages(processedMessages);
       } catch (error) {
         console.error("Failed to fetch messages:", error);
       }
@@ -40,22 +64,43 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
     fetchMessages();
 
-    // Optionally, you can subscribe to real-time messages here
     const unsubscribe = client.onMessage((newMessage) => {
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          sender: "adjudicator",
+          author: "adjudicator",
+          type: "adjudicator",
+          timestamp: "",
+          content: newMessage.text || "",
+        },
+      ]);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, [claimId, client]);
+  }, [claimId, client, messages, setMessages, client.onMessage]);
 
-  // Handle sending a message
+  // Auto-scroll to the bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, messagesEndRef]);
+
   const handleSendMessage = async () => {
     if (messageInput.trim()) {
       try {
         await client.sendUserResponse(messageInput, claimId);
-        console.log("Message sent:", messageInput);
-        setMessageInput("");  // Clear input after sending
+        setMessageInput("");
+        setMessages([
+          ...messages,
+          {
+            author: "You",
+            type: "user",
+            timestamp: "",
+            content: messageInput,
+          },
+        ]);
       } catch (error) {
         console.error("Failed to send message:", error);
       }
@@ -106,10 +151,16 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-medium ${getAuthorColor(msg.type)}`}>
+                      <span
+                        className={`text-sm font-medium ${getAuthorColor(
+                          msg.type
+                        )}`}
+                      >
                         {msg.author}
                       </span>
-                      <span className="text-xs text-slate-500">{msg.timestamp}</span>
+                      <span className="text-xs text-slate-500">
+                        {msg.timestamp}
+                      </span>
                     </div>
                     <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg px-4 py-3 text-slate-200 shadow-sm transition-all duration-200 group-hover:bg-slate-800 text-left">
                       {msg.content}
@@ -118,6 +169,8 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
                 </div>
               </div>
             ))}
+            {/* Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Area */}

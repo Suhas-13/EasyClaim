@@ -20,10 +20,14 @@ class ChargebackClient {
   }
 
   // Initialize the connection and set up socket event handlers
-  async connect(): Promise<void> {
+  async connect(claimId: string): Promise<void> {
     if (this.socket) return;
 
-    this.socket = io(this.baseUrl);
+    this.socket = io(this.baseUrl, {
+      query: {
+        claimId: claimId
+      }
+    });
 
     this.socket.on('connect', () => {
       this.connected = true;
@@ -44,6 +48,12 @@ class ChargebackClient {
     });
   }
 
+
+  async fetchViewPage(claimId: string){
+    const response = await fetch(`${this.baseUrl}/view/${claimId}`, {
+      credentials: 'include', // Include cookies with the request
+    });
+  }
   // Login/initialize user session
   async login(uuid: string | null = null): Promise<string> {
     const response = await fetch(`${this.baseUrl}/login/${uuid || 'new'}`, {
@@ -180,6 +190,10 @@ class ChargebackClient {
       this.connected = false;
       this.messageHandlers.clear();
     }
+  }
+
+  addMessageHandler(messageHandler:any){
+    this.messageHandlers.add(messageHandler);
   }
 }
 

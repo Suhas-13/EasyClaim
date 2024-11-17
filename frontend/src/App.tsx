@@ -22,11 +22,14 @@ const App = () => {
 
     const initializeClient = async () => {
       try {
-        await chargebackClient.connect();
+        let result = await chargebackClient.startNewClaim();
+        await chargebackClient.connect(result.toString());
         console.log(chargebackClient)
         setConnected(true);
         console.log('Client initialized and connected.');
-        setClaimId(await chargebackClient.startNewClaim());
+        setClaimId(result);
+        console.log(document.cookie);
+        console.log(document.cookie);
       } catch (error) {
         console.error('Failed to connect the client:', error);
       }
