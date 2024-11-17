@@ -269,8 +269,14 @@ Provide your response in JSON format:
     tracking_number = tracking_details.get("tracking_number")
 
     # Step 2: Validate extracted details
-    if not provider or not tracking_number:
-        return {"error": "Tracking provider or tracking number is missing."}
+    if not provider and not tracking_number:
+        return {"error": "Tracking provider and tracking number is missing."}
+
+    if not provider:
+        return {"error": "Tracking provider is missing."}
+
+    if not tracking_number:
+        return {"error": "Tracking number is missing."}
 
     # Step 3: Call the mock shipping API
     tracking_info = call_shipping_api(provider, tracking_number)
