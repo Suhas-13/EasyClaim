@@ -24,7 +24,7 @@ import base64
 import json
 from datetime import datetime
 import mimetypes
-import uuid
+
 from enum import Enum
 from flask_cors import CORS
 

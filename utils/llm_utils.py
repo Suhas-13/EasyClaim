@@ -9,7 +9,7 @@ from openai import OpenAI
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 from PyPDF2 import PdfReader
 from openai import OpenAI
-import UUID
+from uuid import UUID
 
 client = OpenAI()
 
