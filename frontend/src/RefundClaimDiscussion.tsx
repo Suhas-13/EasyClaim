@@ -27,6 +27,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   
   // Fetch messages when the component mounts
   useEffect(() => {
+    console.log(claimId);
     const fetchMessages = async () => {
       try {
         const fetchedMessages = await client.getMessages(claimId.toString());
