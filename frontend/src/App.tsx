@@ -27,6 +27,7 @@ const App = () => {
         let result = await chargebackClient.startNewClaim();
         await chargebackClient.connect(result.toString());
         setConnected(true);
+        console.log(chargebackClient);
         console.log("Client initialized and connected.");
       } catch (error) {
         console.error("Failed to connect the client:", error);
@@ -90,7 +91,7 @@ const App = () => {
           <Route path="/claim/:id" element={<Claim />} />
           <Route
             path="/bankingApp"
-            element={claimDetails ? <BankingApp /> : <div>Loading...</div>}
+            element={(claimDetails && client) ? <BankingApp client={client}/> : <div>Loading...</div>}
           />
           <Route path="/home" element={<Home />} />
         </Routes>
