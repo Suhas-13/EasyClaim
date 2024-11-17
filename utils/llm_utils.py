@@ -17,7 +17,7 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 # Set up OpenAI API key
   # Ensure your API key is set in environment variables
 
-def generate_structured_summary(answers, files, transaction_details, additional_info=""):
+def generate_structured_summary(claim, answers, files, transaction_details, additional_info=""):
     print(answers)
     messages = [
         {
@@ -35,12 +35,11 @@ Include all relevant information from the attached evidence.
 
 Provide the JSON output only, with the following structure:
 - "transaction_details": {{
-    "transaction_name": "{transaction_details.get('transaction_name', '')}",
-    "date_of_transaction": "{transaction_details.get('date', '')}",
-    "amount": "{transaction_details.get('amount', '')}",  # If available
-    "merchant_name": "{transaction_details.get('merchant_name', '')}",
-    "merchant_email": "{transaction_details.get('merchant_email', '')}",
-    "transaction_id": "{transaction_details.get('transaction_id', '')}"
+    "transaction_name": "{claim.transaction_description}",
+    "date_of_transaction": "{claim.transaction_date}",
+    "amount": "{claim.amount}",  # If available
+    "merchant_email": "{claim.merchant_email}",
+    "transaction_id": "{claim.transaction_id}"
     "user_id": "{uuid.uuid4()}",
     "issue_description": "",
     "dispute_category": "",  # E.g., "Item not received", "Item damaged", "Unauthorized transaction", "Other"
