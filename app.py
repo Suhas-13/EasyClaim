@@ -245,21 +245,17 @@ def get_all_messages():
 def handle_connect():
     session_id = request.sid
     user_uuid = session.get('user_uuid')
-    user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
-    if not user:
-        return
-
     # Get the current claim ID from the session
     claim_id = session.get('current_claim_id')
-    
+    print('----')
     if not claim_id:
         # No claim in session; do nothing
+        claim_id = request.args.get('claimId')
+
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
+    if not claim:
+        # Claim not found; do nothing
         return
-    else:
-        claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
-        if not claim:
-            # Claim not found; do nothing
-            return
 
     # Get transaction details from the client (if needed)
     transaction_details = session.get('transaction_details')
@@ -282,10 +278,12 @@ def handle_connect():
 
  
     # If there is a current question, resume from there
+    print(claim)
     if claim.current_question:
         ask_next_question(claim)
     else:
         # Start the conversation
+        print('Starting Conversation')
         start_conversation(claim, transaction_details)
 
 def start_conversation(claim, transaction_details):
@@ -678,7 +676,7 @@ def create_claim():
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
-    claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
+    claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
         return
 
