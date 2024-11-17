@@ -112,7 +112,7 @@ Additional Information:
     try:
         structured_data = json.loads(structured_summary)
         shipping_info = shipping_expert_review(messages, structured_data)
-        structured_data["tracking_info"] = {"data": str(shipping_info)}
+        structured_data["tracking_info"] = shipping_info
         print(structured_data   )
     except json.JSONDecodeError:
         structured_data = {}
@@ -276,4 +276,4 @@ Tracking provider can be one of the following: "UPS", "FedEx", "USPS", "DHL", "O
     
     print(formatted_info)
     
-    return formatted_info
+    return {"data": formatted_info}
