@@ -46,11 +46,11 @@ const BankingApp: React.FC<BankingAppProps> = ({ client }) => {
   ];
 
   const transactions: Transaction[] = [
-    { id: 1, date: '2024-11-15', description: 'Payment to John Doe', amount: -100.00, status: 'Completed', category: 'Transfer' },
-    { id: 2, date: '2024-11-14', description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income' },
-    { id: 3, date: '2024-11-10', description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment' },
-    { id: 4, date: '2024-11-09', description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills' },
-    { id: 5, date: '2024-11-08', description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping' }
+    { id: 1, date: '2024-10-13', description: 'Payment to Apple', amount: -600.00, status: 'Completed', category: 'Shopping' },
+    { id: 2, date: '2024-10-14', description: 'Salary Deposit', amount: 3000.00, status: 'Completed', category: 'Income' },
+    { id: 3, date: '2024-10-10', description: 'Subscription: Netflix', amount: -15.99, status: 'Completed', category: 'Entertainment' },
+    { id: 4, date: '2024-10-09', description: 'Payment to XYZ Corp', amount: -500.00, status: 'Completed', category: 'Bills' },
+    { id: 5, date: '2024-10-08', description: 'Refund from Store', amount: 50.00, status: 'Completed', category: 'Shopping' }
   ];
 
   const handleDisputeTransaction = async () => {
