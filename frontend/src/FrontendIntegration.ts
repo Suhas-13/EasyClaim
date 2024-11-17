@@ -22,6 +22,7 @@ class ChargebackClient {
 
   // Initialize the connection and set up socket event handlers
   async connect(claimId: string): Promise<void> {
+    console.log(claimId);
     if (this.socket) return;
 
 

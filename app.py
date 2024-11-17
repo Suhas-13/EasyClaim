@@ -177,7 +177,6 @@ def start_new_claim():
     claim = Claim(user_id=user.id, status='In Progress', state=ClaimState.START.value)
     db.session.add(claim)
     db.session.commit()
-    session['current_claim_id'] = claim.id
     
     session['transaction_details'] = {
         'transaction_name': 'Purchase at ABC Store',
@@ -219,6 +218,7 @@ def get_messages(claim_id):
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
+    print(claim_id)
     print(claim.messages)
     if not claim:
         return jsonify({'error': 'Unauthorized access or claim not found.'}), 403
@@ -247,11 +247,10 @@ def handle_connect():
     session_id = request.sid
     user_uuid = session.get('user_uuid')
     # Get the current claim ID from the session
-    claim_id = session.get('current_claim_id')
+    # claim_id = session.get('current_claim_id')
     print('----')
-    if not claim_id:
         # No claim in session; do nothing
-        claim_id = request.args.get('claimId')
+    claim_id = request.args.get('claimId')
 
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
@@ -288,6 +287,7 @@ def handle_connect():
         start_conversation(claim, transaction_details)
 
 def start_conversation(claim, transaction_details):
+    print(claim.id)
     # Only send initial messages if this is a new claim (no messages exist)
     if not claim.messages:
         transaction_info = f"""
@@ -479,9 +479,7 @@ def handle_user_response(data):
     session_id = request.sid
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
-    claim_id = session.get('current_claim_id')
-    if not session.get('current_claim_id'):
-        claim_id = data.get('claim_id')
+    claim_id = data.get('claim_id')
 
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
     if not claim:
@@ -616,11 +614,9 @@ def validate_response_with_gpt4(claim_id, question_text, user_response):
 @socketio.on('upload_file_chunk')
 def handle_file_chunk(data):
     session_id = request.sid
-    claim_id = session.get('current_claim_id')
     data = data.get('data')
     
-    if not claim_id:
-        claim_id = data.get('claimId')
+    claim_id = data.get('claimId')
         
     claim = Claim.query.filter_by(id=claim_id).with_for_update().first()
 
