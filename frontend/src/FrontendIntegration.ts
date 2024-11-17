@@ -2,6 +2,7 @@ import io, { Socket } from 'socket.io-client';
 
 interface FileChunkData {
   filename: string;
+  claimId: number;
   data: string | ArrayBuffer | null;
   chunk: number;
   totalChunks: number;
@@ -113,7 +114,7 @@ class ChargebackClient {
   }
 
   // Upload file in chunks
-  async uploadFile(file: File, onProgress?: (progress: number) => void): Promise<void> {
+  async uploadFile(claimId: number, file: File, onProgress?: (progress: number) => void): Promise<void> {
     const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -126,6 +127,7 @@ class ChargebackClient {
           try {
             await this.uploadFileChunk({
               filename: file.name,
+              claimId: claimId,
               data: reader.result,
               chunk: i,
               totalChunks,
@@ -153,8 +155,8 @@ class ChargebackClient {
         reject(new Error('Not connected to server'));
         return;
       }
-
-      this.socket!.emit('upload_file_chunk', chunkData);
+      console.log('Uploading chunk', chunkData.chunk);
+      this.socket!.emit('upload_file_chunk', {data: chunkData});
       resolve();
     });
   }

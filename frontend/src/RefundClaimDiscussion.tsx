@@ -37,6 +37,43 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesFetchedRef = useRef(false);
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        setUploadProgress(0); // Reset progress
+        await client.uploadFile(claimId, file, (progress) => {
+          setUploadProgress(progress * 100); // Update progress in percentage
+        });
+        console.log("File uploaded successfully");
+        // Optionally, add a message indicating the file upload success
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            content: `File "${file.name}" uploaded successfully.`,
+            author: "You",
+            type: "user",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } catch (error) {
+        console.error("File upload failed:", error);
+        // Optionally, add a message indicating the file upload failure
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            content: `Failed to upload file "${file.name}".`,
+            author: "You",
+            type: "user",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    }
+  };
+
   // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
@@ -145,7 +182,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
   };
 
   return (
-    <div>
+     <div>
       <Navbar />
       <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
         <div className="w-1/3 border-r border-slate-800">
@@ -183,7 +220,7 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
           </div>
 
           <div className="absolute bottom-0 left-0 right-0 p-6 bg-slate-900/50 backdrop-blur-sm border-t border-slate-800">
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
               <input
                 type="text"
                 value={messageInput}
@@ -204,8 +241,18 @@ const RefundClaimDiscussion: React.FC<RefundClaimDiscussionProps> = ({
               >
                 Attach
               </label>
-              <input type="file" id="file-upload" className="hidden" />
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
             </div>
+            {uploadProgress > 0 && (
+              <div className="text-sm text-slate-400 mt-2">
+                Upload Progress: {uploadProgress.toFixed(2)}%
+              </div>
+            )}
           </div>
         </div>
       </div>
