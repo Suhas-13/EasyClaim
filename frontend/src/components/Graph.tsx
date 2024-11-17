@@ -9,7 +9,6 @@ import {
   useNodesState,
   NodeMouseHandler,
 } from "@xyflow/react";
-
 import "@xyflow/react/dist/style.css";
 
 type NodeProps = {
@@ -31,43 +30,43 @@ const initialNodes: Node<NodeProps>[] = [
     id: "1",
     position: { x: 100, y: 50 },
     data: { label: Status.ClaimSubmitted },
-    style: { background: "#EFEFEF", color: "#333", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "2",
     position: { x: 100, y: 150 },
     data: { label: Status.AwaitingCustomerDocuments },
-    style: { background: "#FCE4EC", color: "#AD1457", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "3",
     position: { x: 300, y: 150 },
     data: { label: Status.AwaitingSellerDocuments },
-    style: { background: "#FFF9C4", color: "#F57F17", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "4",
     position: { x: 200, y: 250 },
     data: { label: Status.AwaitingLLMScreening },
-    style: { background: "#E8F5E9", color: "#2E7D32", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "5",
     position: { x: 100, y: 350 },
     data: { label: Status.AwaitingReview },
-    style: { background: "#E3F2FD", color: "#1565C0", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "6",
     position: { x: 50, y: 450 },
     data: { label: Status.ClaimApproved },
-    style: { background: "#C8E6C9", color: "#1B5E20", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
   {
     id: "7",
     position: { x: 250, y: 450 },
     data: { label: Status.ClaimRejected },
-    style: { background: "#FFCDD2", color: "#B71C1C", borderRadius: "8px" },
+    style: { background: "#1e293b", color: "#ffffff", borderRadius: "8px" }, // slate-950 background and white text
   },
 ];
 
@@ -77,24 +76,32 @@ const initialEdges: Edge[] = [
     source: "1",
     target: "2",
     type: "smoothstep",
+    animated: true,
+    style: { stroke: "#CBD5E0", strokeWidth: 2 },
   },
   {
     id: "e1-3",
     source: "1",
     target: "3",
     type: "smoothstep",
+    animated: true,
+    style: { stroke: "#CBD5E0", strokeWidth: 2 },
   },
   {
     id: "e2-4",
     source: "2",
     target: "4",
     type: "smoothstep",
+    animated: true,
+    style: { stroke: "#CBD5E0", strokeWidth: 2 },
   },
   {
     id: "e3-4",
     source: "3",
     target: "4",
     type: "smoothstep",
+    animated: true,
+    style: { stroke: "#CBD5E0", strokeWidth: 2 },
   },
   {
     id: "e4-5",
@@ -102,8 +109,9 @@ const initialEdges: Edge[] = [
     target: "5",
     label: "LLM Complete",
     type: "smoothstep",
-    style: { stroke: "green" },
-    labelStyle: { fill: "green", fontWeight: 600 },
+    style: { stroke: "#68D391", strokeWidth: 2 },
+    labelStyle: { fill: "#68D391", fontWeight: 600 },
+    animated: true,
   },
   {
     id: "e5-6",
@@ -111,8 +119,9 @@ const initialEdges: Edge[] = [
     target: "6",
     label: "Approve",
     type: "smoothstep",
-    style: { stroke: "#1B5E20" },
-    labelStyle: { fill: "#1B5E20", fontWeight: 600 },
+    style: { stroke: "#38A169", strokeWidth: 2 },
+    labelStyle: { fill: "#38A169", fontWeight: 600 },
+    animated: true,
   },
   {
     id: "e5-7",
@@ -120,8 +129,9 @@ const initialEdges: Edge[] = [
     target: "7",
     label: "Reject",
     type: "smoothstep",
-    style: { stroke: "#B71C1C" },
-    labelStyle: { fill: "#B71C1C", fontWeight: 600 },
+    style: { stroke: "#E53E3E", strokeWidth: 2 },
+    labelStyle: { fill: "#E53E3E", fontWeight: 600 },
+    animated: true,
   },
 ];
 
@@ -141,7 +151,7 @@ export const Graph = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   return (
-    <div className="flex w-1/2">
+    <div className="flex w-full bg-slate-950"> {/* Make the background of the container dark */}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -150,7 +160,7 @@ export const Graph = ({
         onEdgesChange={onEdgesChange}
         fitView
       >
-        <Background gap={12} size={1} color="#808080" />
+        <Background gap={12} size={1} color="#2D3748" /> {/* Dark background for the graph */}
         <Controls />
       </ReactFlow>
     </div>

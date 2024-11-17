@@ -19,6 +19,12 @@ const Navbar: React.FC = () => {
             Home
           </Link>
           <Link
+            to="/creditCompany"
+            className="text-slate-300 hover:text-emerald-500 transition duration-200"
+          >
+            For Credit Companies
+          </Link>
+          <Link
             to="/policyView"
             className="text-slate-300 hover:text-emerald-500 transition duration-200"
           >

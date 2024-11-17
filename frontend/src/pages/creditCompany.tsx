@@ -5,9 +5,7 @@ import Navbar from "../components/Navbar";
 import { Claim } from "../types";
 
 export const CreditCompanyPage = () => {
-  const [selectedClaimState, setSelectedClaimState] = useState<
-    string | undefined
-  >(undefined);
+  const [selectedClaimState, setSelectedClaimState] = useState<string | undefined>("");
 
   const handleStateClaimChange = React.useCallback((claimState: string) => {
     setSelectedClaimState(claimState);
@@ -15,8 +13,9 @@ export const CreditCompanyPage = () => {
 
   const [claims, setClaims] = useState<Claim[]>(mockClaims);
 
+  // If selectedClaimState is undefined or empty, show all claims
   const filteredClaims = React.useMemo(
-    () => claims.filter((claim) => claim.status === selectedClaimState),
+    () => (selectedClaimState ? claims.filter((claim) => claim.status === selectedClaimState) : claims),
     [claims, selectedClaimState]
   );
 
@@ -25,16 +24,14 @@ export const CreditCompanyPage = () => {
       claims.map((claim) => (claim.id === id ? { ...claim, status } : claim))
     );
   }, []);
+
   return (
     <div>
-      <Navbar></Navbar>
-    <div className="flex flex-row min-h-5 h-screen">
-      <CreditCompanyUi
-        claims={filteredClaims}
-        setClaimStatus={setClaimStatus}
-      />
-      <Graph handleStateClaimChange={handleStateClaimChange} />
-    </div>
+      <Navbar />
+      <div className="flex flex-row min-h-5 h-screen">
+        <CreditCompanyUi claims={filteredClaims} setClaimStatus={setClaimStatus} />
+        <Graph handleStateClaimChange={handleStateClaimChange} />
+      </div>
     </div>
   );
 };
