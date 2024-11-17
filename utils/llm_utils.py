@@ -9,7 +9,7 @@ from openai import OpenAI
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 from PyPDF2 import PdfReader
 from openai import OpenAI
-from openai import OpenAI
+import UUID
 
 client = OpenAI()
 
@@ -18,7 +18,7 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 # Set up OpenAI API key
   # Ensure your API key is set in environment variables
 
-def generate_structured_summary(answers, files, user_id, transaction_details, additional_info=""):
+def generate_structured_summary(answers, files, transaction_details, additional_info=""):
     print(answers)
     messages = [
         {
@@ -42,7 +42,7 @@ Provide the JSON output only, with the following structure:
     "merchant_name": "{transaction_details.get('merchant_name', '')}",
     "merchant_email": "{transaction_details.get('merchant_email', '')}",
     "transaction_id": "{transaction_details.get('transaction_id', '')}"
-    "user_id": "{user_id}",
+    "user_id": "{UUID.randomUUID()}",
     "issue_description": "",
     "dispute_category": "",  # E.g., "Item not received", "Item damaged", "Unauthorized transaction", "Other"
     "item_or_service": "", # E.g., "Physical goods", "Digital goods", "Services"

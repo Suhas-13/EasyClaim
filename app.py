@@ -562,7 +562,7 @@ def handle_user_response(data):
                 'filepath': file_record.filepath  # Include filepath for PDF processing
             })
             
-    structured_data = generate_structured_summary(answers, files, user.id, transaction_details, claim.additional_info)
+    structured_data = generate_structured_summary(answers, files, transaction_details, claim.additional_info)
     claim.structured_data = json.dumps(structured_data)
     db.session.commit()
     emit('update_claim_summary', {'claim_summary': structured_data})
