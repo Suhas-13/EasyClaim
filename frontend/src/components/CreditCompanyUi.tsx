@@ -15,7 +15,7 @@ export const CreditCompanyUi = ({
 
   // Modify the viewClaim function to navigate to /policyView with the claim's ID
   const viewClaim = React.useCallback((id: number) => {
-    navigate(`/refundClaimDiscussion/${id}`); // Redirect to /policyView with claim id
+    navigate(`/claim/${id}`); // Redirect to /policyView with claim id
   }, [navigate]);
 
   return (

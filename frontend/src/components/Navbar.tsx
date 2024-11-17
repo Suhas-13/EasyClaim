@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
             Your Policies
           </Link>
           <Link
-            to="/refundClaimDiscussion/1"
+            to="/claim/1"
             className="text-slate-300 hover:text-emerald-500 transition duration-200"
           >
             Claim Overview
