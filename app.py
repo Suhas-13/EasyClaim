@@ -26,8 +26,11 @@ from datetime import datetime
 import mimetypes
 import uuid
 from enum import Enum
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, supports_credentials=True)
+
 app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with your actual secret key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///claims.db'
 app.config['UPLOAD_FOLDER'] = 'uploaded_files'
@@ -36,7 +39,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 db = SQLAlchemy(app)
 socketio = SocketIO(app, manage_session=False, max_http_buffer_size=100000000)
 
-
+suhas_mode = True
 
 # Define Claim States
 class ClaimState(Enum):
@@ -184,7 +187,10 @@ def start_new_claim():
     }
 
     # Redirect to the claim chat window
-    return redirect(url_for('view_claim', claim_id=claim.id))
+    if suhas_mode:
+        return redirect(url_for('view_claim', claim_id=claim.id))
+    else:
+        return jsonify({'id': claim.id})
 
 @app.route('/claim/<int:claim_id>')
 def view_claim(claim_id):
@@ -472,6 +478,9 @@ def handle_user_response(data):
     user_uuid = session.get('user_uuid')
     user = User.query.filter_by(user_uuid=user_uuid).with_for_update().first()
     claim_id = session.get('current_claim_id')
+    if not session.get('current_claim_id'):
+        claim_id = data.get('claim_id')
+
     claim = Claim.query.filter_by(id=claim_id, user_id=user.id).with_for_update().first()
     if not claim:
         return
